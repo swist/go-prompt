@@ -1,8 +1,13 @@
 # Change Log
 
-## v0.3.0 (2018/??/??)
+## v0.3.0 (2021/06/03)
 
-next release.
+* Fork from github.com/c-bata/go-prompt
+* Adopt upstream PR [#185](https://github.com/c-bata/go-prompt/pull/185)
+
+## v0.2.4-v0.2.6
+
+* (see upstream git history)
 
 ## v0.2.3 (2018/10/25)
 
