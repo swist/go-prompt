@@ -30,6 +30,8 @@ func GetKey(b []byte) Key {
 	return NotDefined
 }
 
+var ttyFallbackErrors = []string{}
+
 // ASCIISequences holds mappings of the key and byte array.
 var ASCIISequences = []*ASCIICode{
 	{Key: Escape, ASCIICode: []byte{0x1b}},

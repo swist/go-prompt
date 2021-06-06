@@ -266,6 +266,14 @@ func OptionSetExitCheckerOnInput(fn ExitChecker) Option {
 	}
 }
 
+// OptionTtyFallbackErrors list of error strings to consider when falling back when opening tty fd fails
+func OptionTtyFallbackErrors(errors []string) Option {
+	return func(p *Prompt) error {
+		ttyFallbackErrors = errors
+		return nil
+	}
+}
+
 // New returns a Prompt with powerful auto-completion.
 func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 	defaultWriter := NewStdoutWriter()
