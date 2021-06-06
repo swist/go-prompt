@@ -280,7 +280,6 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 	registerConsoleWriter(defaultWriter)
 
 	pt := &Prompt{
-		in: NewStandardInputParser(),
 		renderer: &Render{
 			prefix:                       "> ",
 			out:                          defaultWriter,
@@ -314,5 +313,8 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 			panic(err)
 		}
 	}
+
+	pt.in = NewStandardInputParser()
+
 	return pt
 }
