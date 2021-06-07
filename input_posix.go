@@ -74,10 +74,12 @@ var _ ConsoleParser = &PosixParser{}
 // NewStandardInputParser returns ConsoleParser object to read from stdin.
 func NewStandardInputParser() *PosixParser {
 	in, err := syscall.Open("/dev/tty", syscall.O_RDONLY, 0)
-	if os.IsNotExist(err) || (err != nil && strings.Contains(ttyFallbackErrors, err.Error())) {
-		in = syscall.Stdin
-	} else if err != nil {
-		panic(err)
+	if err != nil {
+		if os.IsNotExist(err) || strings.Contains(ttyFallbackErrors, err.Error()) {
+			in = syscall.Stdin
+		} else if err != nil {
+			panic(err)
+		}
 	}
 
 	return &PosixParser{
