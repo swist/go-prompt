@@ -27,6 +27,15 @@ func NewDocument() *Document {
 	}
 }
 
+// NewDocument return the new document with specific fields.
+func NewDocumentWith(text string, cursorPosition int, lastKey Key) *Document {
+	return &Document{
+		Text:           text,
+		cursorPosition: cursorPosition,
+		lastKey:        lastKey,
+	}
+}
+
 // LastKeyStroke return the last key pressed in this document.
 func (d *Document) LastKeyStroke() Key {
 	return d.lastKey
