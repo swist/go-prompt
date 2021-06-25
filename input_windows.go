@@ -34,6 +34,12 @@ func (p *WindowsParser) Setup() error {
 
 // TearDown should be called after stopping input
 func (p *WindowsParser) TearDown() error {
+	// TODO: investigate the root cause behind these panics
+	defer func() {
+		if r := recover(); r != nil {
+			debug.Log(fmt.Sprintf("recovered panic closing go-tty channel: %v", r))
+		}
+	}()
 	return p.tty.Close()
 }
 
