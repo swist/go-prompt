@@ -4,10 +4,12 @@ package prompt
 
 import (
 	"errors"
+	"fmt"
 	"syscall"
 	"unicode/utf8"
 	"unsafe"
 
+	"github.com/c-bata/go-prompt/internal/debug"
 	tty "github.com/mattn/go-tty"
 )
 
