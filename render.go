@@ -1,6 +1,7 @@
 package prompt
 
 import (
+	"os"
 	"runtime"
 
 	"github.com/c-bata/go-prompt/internal/debug"
@@ -271,7 +272,13 @@ func (r *Render) toPos(cursor int) (x, y int) {
 }
 
 func (r *Render) lineWrap(cursor int) {
-	if runtime.GOOS != "windows" && cursor > 0 && cursor%int(r.col) == 0 {
+	if runtime.GOOS == "windows" {
+		// WT_SESSION indicates Windows Terminal, which is more rational than the older cmd or ps terminals
+		if _, ok := os.LookupEnv("WT_SESSION"); !ok {
+			return
+		}
+	}
+	if cursor > 0 && cursor%int(r.col) == 0 {
 		r.out.WriteRaw([]byte{'\n'})
 	}
 }

@@ -69,7 +69,12 @@ func (p *WindowsParser) Read() ([]byte, error) {
 func (p *WindowsParser) GetWinSize() *WinSize {
 	w, h, err := p.tty.Size()
 	if err != nil {
-		panic(err)
+		// If this errors, we simply return the default window size as
+		// it's our best guess.
+		return &WinSize{
+			Row: 25,
+			Col: 80,
+		}
 	}
 	return &WinSize{
 		Row: uint16(h),
