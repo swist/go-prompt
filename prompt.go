@@ -41,6 +41,13 @@ type Exec struct {
 	input string
 }
 
+func (p *Prompt) Refresh(update bool) {
+	if update {
+		p.completion.Update(*p.buf.Document())
+	}
+	p.renderer.Render(p.buf, p.completion)
+}
+
 // Run starts prompt.
 func (p *Prompt) Run() {
 	p.skipTearDown = false
@@ -49,11 +56,7 @@ func (p *Prompt) Run() {
 	p.setUp()
 	defer p.tearDown()
 
-	if p.completion.showAtStart {
-		p.completion.Update(*p.buf.Document())
-	}
-
-	p.renderer.Render(p.buf, p.completion)
+	p.Refresh(p.completion.showAtStart)
 
 	bufCh := make(chan []byte)
 	go p.readBuffer(bufCh)
@@ -78,9 +81,7 @@ func (p *Prompt) Run() {
 				debug.AssertNoError(p.in.TearDown())
 				p.executor(e.input)
 
-				p.completion.Update(*p.buf.Document())
-
-				p.renderer.Render(p.buf, p.completion)
+				p.Refresh(true)
 
 				if p.exitChecker != nil && p.exitChecker(e.input, true) {
 					p.skipTearDown = true
@@ -90,12 +91,11 @@ func (p *Prompt) Run() {
 				debug.AssertNoError(p.in.Setup())
 				go p.handleSignals(exitCh, winSizeCh, stopHandleSignalCh)
 			} else {
-				p.completion.Update(*p.buf.Document())
-				p.renderer.Render(p.buf, p.completion)
+				p.Refresh(true)
 			}
 		case w := <-winSizeCh:
 			p.renderer.UpdateWinSize(w)
-			p.renderer.Render(p.buf, p.completion)
+			p.Refresh(false)
 		case code := <-exitCh:
 			p.renderer.BreakLine(p.buf)
 			p.tearDown()
@@ -229,11 +229,8 @@ func (p *Prompt) Input() string {
 	p.setUp()
 	defer p.tearDown()
 
-	if p.completion.showAtStart {
-		p.completion.Update(*p.buf.Document())
-	}
+	p.Refresh(p.completion.showAtStart)
 
-	p.renderer.Render(p.buf, p.completion)
 	bufCh := make(chan []byte)
 	go p.readBuffer(bufCh)
 
@@ -246,8 +243,7 @@ func (p *Prompt) Input() string {
 			} else if e != nil {
 				return e.input
 			} else {
-				p.completion.Update(*p.buf.Document())
-				p.renderer.Render(p.buf, p.completion)
+				p.Refresh(true)
 			}
 		}
 	}
