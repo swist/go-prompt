@@ -182,10 +182,16 @@ func (b *Buffer) SwapCharactersBeforeCursor() {
 
 // NewBuffer is constructor of Buffer struct.
 func NewBuffer() (b *Buffer) {
+	return NewBufferWithLine("")
+}
+
+// NewBufferWithLine is constructor of Buffer struct.
+func NewBufferWithLine(line string) (b *Buffer) {
 	b = &Buffer{
-		workingLines:    []string{""},
+		workingLines:    []string{line},
 		workingIndex:    0,
 		preferredColumn: -1, // -1 means nil
+		cursorPosition:  len(line),
 	}
 	return
 }

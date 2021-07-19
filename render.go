@@ -58,7 +58,7 @@ func (r *Render) getCurrentPrefix() string {
 
 func (r *Render) renderPrefix() {
 	r.out.SetColor(r.prefixTextColor, r.prefixBGColor, false)
-	r.out.WriteRaw([]byte(r.getCurrentPrefix()))
+	r.out.WriteStr(r.getCurrentPrefix())
 	r.out.SetColor(DefaultColor, DefaultColor, false)
 	r.out.Flush()
 }

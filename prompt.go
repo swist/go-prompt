@@ -41,6 +41,10 @@ type Exec struct {
 	input string
 }
 
+func (p *Prompt) Buffer(line string) {
+	p.buf = NewBufferWithLine(line)
+}
+
 func (p *Prompt) Refresh(update bool) {
 	if update {
 		p.completion.Update(*p.buf.Document())
