@@ -3,6 +3,7 @@ module github.com/c-bata/go-prompt
 go 1.14
 
 require (
+	github.com/jwalton/go-supportscolor v1.0.0
 	github.com/mattn/go-colorable v0.1.8
 	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/mattn/go-runewidth v0.0.13
