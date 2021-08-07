@@ -63,7 +63,7 @@ func (p *Prompt) Run() {
 	p.Refresh(p.completion.showAtStart)
 
 	bufCh := make(chan []byte)
-	go p.readBuffer(bufCh)
+	go p.readLine(bufCh)
 
 	exitCh := make(chan int)
 	winSizeCh := make(chan *WinSize)
@@ -83,8 +83,8 @@ func (p *Prompt) Run() {
 				// Unset raw mode
 				// Reset to Blocking mode because returned EAGAIN when still set non-blocking mode.
 				debug.AssertNoError(p.in.TearDown())
-				p.executor(e.input)
 
+				p.executor(e.input)
 				p.Refresh(true)
 
 				if p.exitChecker != nil && p.exitChecker(e.input, true) {
@@ -94,6 +94,7 @@ func (p *Prompt) Run() {
 				// Set raw mode
 				debug.AssertNoError(p.in.Setup())
 				go p.handleSignals(exitCh, winSizeCh, stopHandleSignalCh)
+				go p.readLine(bufCh)
 			} else {
 				p.Refresh(true)
 			}
@@ -236,7 +237,7 @@ func (p *Prompt) Input() string {
 	p.Refresh(p.completion.showAtStart)
 
 	bufCh := make(chan []byte)
-	go p.readBuffer(bufCh)
+	go p.readLine(bufCh)
 
 	for {
 		select {
@@ -253,15 +254,22 @@ func (p *Prompt) Input() string {
 	}
 }
 
-func (p *Prompt) readBuffer(bufCh chan []byte) {
-	debug.Log("start reading buffer")
+func (p *Prompt) readLine(bufCh chan []byte) {
+	debug.Log("start reading input until end of line")
 
-	// blocking read from tty, this groutine will not exit until os.Exit()
 	for {
 		if b, err := p.in.Read(); err == nil && !(len(b) == 1 && b[0] == 0) {
-			bufCh <- b // blocking send
+			// blocking send
+			bufCh <- b
+			// if EOL, stop reading
+			k := GetKey(b)
+			if k == Enter || k == ControlJ || k == ControlM {
+				break
+			}
 		}
 	}
+
+	debug.Log("stopped reading input after reading end of line")
 }
 
 func (p *Prompt) setUp() {
