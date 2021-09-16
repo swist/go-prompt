@@ -13,7 +13,7 @@ import (
 	tty "github.com/mattn/go-tty"
 )
 
-const maxReadBytes = 1024
+const maxReadBytes = 4096
 
 var kernel32 = syscall.NewLazyDLL("kernel32.dll")
 

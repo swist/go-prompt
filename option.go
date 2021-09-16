@@ -315,6 +315,7 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 	}
 
 	pt.in = NewStandardInputParser()
+	pt.r = NewStandardInputReader(pt.in)
 
 	return pt
 }
