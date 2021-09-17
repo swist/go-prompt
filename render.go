@@ -112,14 +112,10 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 	}
 	formatted = formatted[completions.verticalScroll : completions.verticalScroll+windowHeight]
 	selected := completions.selected - completions.verticalScroll
-	if selected >= 0 {
+	if selected >= 0 && completions.expandDescriptions {
 		selectedSuggest := suggestions[completions.selected]
-		maxDescWidth := rightWidth
-		// TODO: need option to toggle this
-		// if completions.expandDescriptions {
-		formatted = r.expandDescription(formatted, selectedSuggest.Description, selected, int(completions.max), maxDescWidth, leftWidth)
+		formatted = r.expandDescription(formatted, selectedSuggest.Description, selected, int(completions.max), rightWidth, leftWidth)
 		windowHeight = len(formatted)
-		// }
 	}
 	r.prepareArea(windowHeight)
 
@@ -151,12 +147,11 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 		}
 		r.out.WriteStr(formatted[i].Text)
 
-		// TODO: need option to toggle this
-		// if i == selected && completions.expandDescriptions {
-		// 	r.out.SetColor(r.selectedDescriptionTextColor, r.selectedDescriptionBGColor, false)
-		// } else {
-		r.out.SetColor(r.descriptionTextColor, r.descriptionBGColor, false)
-		// }
+		if i == selected && !completions.expandDescriptions {
+			r.out.SetColor(r.selectedDescriptionTextColor, r.selectedDescriptionBGColor, false)
+		} else {
+			r.out.SetColor(r.descriptionTextColor, r.descriptionBGColor, false)
+		}
 		r.out.WriteStr(formatted[i].Description)
 
 		if isScrollThumb(i) {
@@ -222,24 +217,6 @@ func (r *Render) expandDescription(formatted []Suggest, expand string, selected 
 			Description: desc,
 		})
 	}
-	// fmt.Printf("--- :%v\n", reformatted)
-
-	// for i, line := range wrapped {
-	// 	text := ""
-	// 	if i > mh {
-	// 		if line != "" || i < lw-1 {
-	// 			reformatted[i-1].Description = "..."
-	// 		}
-	// 		break
-	// 	} else if i < len(formatted) {
-	// 		text = formatted[i].Text
-	// 	}
-	// 	pad := strings.Repeat(" ", mw-len(line))
-	// 	reformatted = append(reformatted, Suggest{
-	// 		Text:        text,
-	// 		Description: " " + line + pad + " ",
-	// 	})
-	// }
 
 	return reformatted
 }

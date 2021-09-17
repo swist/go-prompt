@@ -34,9 +34,10 @@ type CompletionManager struct {
 	max       uint16
 	completer Completer
 
-	verticalScroll int
-	wordSeparator  string
-	showAtStart    bool
+	verticalScroll     int
+	wordSeparator      string
+	showAtStart        bool
+	expandDescriptions bool
 }
 
 // GetSelectedSuggestion returns the selected item.

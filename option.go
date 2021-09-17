@@ -53,6 +53,14 @@ func OptionCompletionWordSeparator(x string) Option {
 	}
 }
 
+// OptionCompletionExpandDescriptions to enable suggestion description expansion.
+func OptionCompletionExpandDescriptions(x bool) Option {
+	return func(p *Prompt) error {
+		p.completion.expandDescriptions = x
+		return nil
+	}
+}
+
 // OptionLivePrefix to change the prefix dynamically by callback function
 func OptionLivePrefix(f func() (prefix string, useLivePrefix bool)) Option {
 	return func(p *Prompt) error {
