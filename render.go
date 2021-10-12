@@ -154,6 +154,9 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 		r.out.CursorDown(1)
 		if i == selected {
 			r.out.SetColor(r.selectedSuggestionTextColor, r.selectedSuggestionBGColor, true)
+		} else if formatted[i].Label {
+			// TODO: proper colors
+			r.out.SetColor(White, Blue, false)
 		} else {
 			r.out.SetColor(r.suggestionTextColor, r.suggestionBGColor, false)
 		}
@@ -161,6 +164,9 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 
 		if i == selected && !completions.expandDescriptions {
 			r.out.SetColor(r.selectedDescriptionTextColor, r.selectedDescriptionBGColor, false)
+		} else if formatted[i].Label && (!completions.expandDescriptions || selected < 0) {
+			// TODO: proper colors
+			r.out.SetColor(White, Blue, false)
 		} else {
 			r.out.SetColor(r.descriptionTextColor, r.descriptionBGColor, false)
 		}
@@ -230,6 +236,7 @@ func (r *Render) expandDescription(formatted []Suggest, expand string, selected 
 		reformatted = append(reformatted, Suggest{
 			Text:        text,
 			Description: desc,
+			Label:       formatted[i].Label,
 		})
 	}
 

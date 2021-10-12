@@ -25,6 +25,7 @@ var (
 type Suggest struct {
 	Text        string
 	Description string
+	Label       bool
 	Context     interface{}             `json:"-"`
 	OnSelected  func(s Suggest) Suggest `json:"-"`
 	OnCommitted func(s Suggest) Suggest `json:"-"`
@@ -105,7 +106,7 @@ func (c *CompletionManager) Previous() {
 		c.verticalScroll--
 	}
 	c.selected--
-	c.update()
+	c.update(c.Previous)
 }
 
 // Next to select the next suggestion item.
@@ -114,7 +115,7 @@ func (c *CompletionManager) Next() {
 		c.verticalScroll++
 	}
 	c.selected++
-	c.update()
+	c.update(c.Next)
 }
 
 // Completing returns whether the CompletionManager selects something one.
@@ -122,7 +123,7 @@ func (c *CompletionManager) Completing() bool {
 	return c.selected != -1
 }
 
-func (c *CompletionManager) update() {
+func (c *CompletionManager) update(skip func()) {
 	max := int(c.max)
 	if len(c.tmp) < max {
 		max = len(c.tmp)
@@ -133,6 +134,10 @@ func (c *CompletionManager) update() {
 	} else if c.selected < -1 {
 		c.selected = len(c.tmp) - 1
 		c.verticalScroll = len(c.tmp) - max
+	}
+
+	if c.selected > -1 && c.tmp[c.selected].Label {
+		skip()
 	}
 }
 
@@ -204,7 +209,7 @@ func formatSuggestions(suggests []Suggest, max int) ([]Suggest, int, int, int) {
 	right, rightWidth := formatTexts(right, max-leftWidth, rightPrefix, rightSuffix)
 
 	for i := 0; i < num; i++ {
-		new[i] = Suggest{Text: left[i], Description: right[i]}
+		new[i] = Suggest{Text: left[i], Description: right[i], Label: suggests[i].Label}
 	}
 	return new, leftWidth + rightWidth, leftWidth, rightWidth
 }
