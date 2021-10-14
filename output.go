@@ -44,9 +44,11 @@ const (
 // Color represents color on terminal.
 type Color int
 
+const Color16Offset = 17
+
 const (
 	// DefaultColor represents a default color.
-	DefaultColor Color = iota
+	DefaultColor Color = iota - Color16Offset
 
 	// Low intensity
 

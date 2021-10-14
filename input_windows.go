@@ -4,14 +4,16 @@ package prompt
 
 import (
 	"errors"
+	"fmt"
 	"syscall"
 	"unicode/utf8"
 	"unsafe"
 
+	"github.com/c-bata/go-prompt/internal/debug"
 	tty "github.com/mattn/go-tty"
 )
 
-const maxReadBytes = 1024
+const maxReadBytes = 4096
 
 var kernel32 = syscall.NewLazyDLL("kernel32.dll")
 
@@ -34,6 +36,12 @@ func (p *WindowsParser) Setup() error {
 
 // TearDown should be called after stopping input
 func (p *WindowsParser) TearDown() error {
+	// TODO: investigate the root cause behind these panics
+	defer func() {
+		if r := recover(); r != nil {
+			debug.Log(fmt.Sprintf("recovered panic closing go-tty channel: %v", r))
+		}
+	}()
 	return p.tty.Close()
 }
 
@@ -69,7 +77,12 @@ func (p *WindowsParser) Read() ([]byte, error) {
 func (p *WindowsParser) GetWinSize() *WinSize {
 	w, h, err := p.tty.Size()
 	if err != nil {
-		panic(err)
+		// If this errors, we simply return the default window size as
+		// it's our best guess.
+		return &WinSize{
+			Row: 25,
+			Col: 80,
+		}
 	}
 	return &WinSize{
 		Row: uint16(h),

@@ -1,6 +1,9 @@
 package prompt
 
-import "bytes"
+import (
+	"bufio"
+	"bytes"
+)
 
 // WinSize represents the width and height of terminal.
 type WinSize struct {
@@ -20,6 +23,23 @@ type ConsoleParser interface {
 	Read() ([]byte, error)
 }
 
+type ConsoleParserReader struct {
+	in ConsoleParser
+}
+
+func (r *ConsoleParserReader) Read(p []byte) (n int, err error) {
+	b, err := r.in.Read()
+	if err != nil {
+		return 0, err
+	}
+	n = copy(p, b)
+	return n, nil
+}
+
+func NewStandardInputReader(in ConsoleParser) *bufio.Reader {
+	return bufio.NewReader(&ConsoleParserReader{in})
+}
+
 // GetKey returns Key correspond to input byte codes.
 func GetKey(b []byte) Key {
 	for _, k := range ASCIISequences {
@@ -29,6 +49,17 @@ func GetKey(b []byte) Key {
 	}
 	return NotDefined
 }
+
+func GetCode(key Key) []byte {
+	for _, k := range ASCIISequences {
+		if k.Key == key {
+			return k.ASCIICode
+		}
+	}
+	return []byte{}
+}
+
+var ttyFallbackErrors = []string{}
 
 // ASCIISequences holds mappings of the key and byte array.
 var ASCIISequences = []*ASCIICode{

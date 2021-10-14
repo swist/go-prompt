@@ -34,9 +34,10 @@ type CompletionManager struct {
 	max       uint16
 	completer Completer
 
-	verticalScroll int
-	wordSeparator  string
-	showAtStart    bool
+	verticalScroll     int
+	wordSeparator      string
+	showAtStart        bool
+	expandDescriptions bool
 }
 
 // GetSelectedSuggestion returns the selected item.
@@ -153,9 +154,9 @@ func formatTexts(o []string, max int, prefix, suffix string) (new []string, widt
 	return n, lenPrefix + width + lenSuffix
 }
 
-func formatSuggestions(suggests []Suggest, max int) (new []Suggest, width int) {
+func formatSuggestions(suggests []Suggest, max int) ([]Suggest, int, int, int) {
 	num := len(suggests)
-	new = make([]Suggest, num)
+	new := make([]Suggest, num)
 
 	left := make([]string, num)
 	for i := 0; i < num; i++ {
@@ -168,14 +169,14 @@ func formatSuggestions(suggests []Suggest, max int) (new []Suggest, width int) {
 
 	left, leftWidth := formatTexts(left, max, leftPrefix, leftSuffix)
 	if leftWidth == 0 {
-		return []Suggest{}, 0
+		return []Suggest{}, 0, 0, 0
 	}
 	right, rightWidth := formatTexts(right, max-leftWidth, rightPrefix, rightSuffix)
 
 	for i := 0; i < num; i++ {
 		new[i] = Suggest{Text: left[i], Description: right[i]}
 	}
-	return new, leftWidth + rightWidth
+	return new, leftWidth + rightWidth, leftWidth, rightWidth
 }
 
 // NewCompletionManager returns initialized CompletionManager object.

@@ -1,8 +1,11 @@
 package prompt
 
 import (
+	"bytes"
+	"os"
 	"runtime"
 	"strings"
+	"unicode"
 
 	"github.com/c-bata/go-prompt/internal/debug"
 	runewidth "github.com/mattn/go-runewidth"
@@ -60,6 +63,7 @@ func (r *Render) renderPrefix() {
 	r.out.SetColor(r.prefixTextColor, r.prefixBGColor, false)
 	r.out.WriteStr(r.getCurrentPrefix())
 	r.out.SetColor(DefaultColor, DefaultColor, false)
+	r.out.Flush()
 }
 
 // TearDown to clear title and erasing.
@@ -93,14 +97,12 @@ func (r *Render) renderWindowTooSmall() {
 
 func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 	suggestions := completions.GetSuggestions()
-	if len(completions.GetSuggestions()) == 0 {
+	if len(suggestions) == 0 {
 		return
 	}
 	prefix := r.getCurrentPrefix()
-	formatted, width := formatSuggestions(
-		suggestions,
-		int(r.col)-runewidth.StringWidth(prefix)-1, // -1 means a width of scrollbar
-	)
+	maxWidth := int(r.col) - runewidth.StringWidth(prefix) - 1 // -1 means a width of scrollbar
+	formatted, width, leftWidth, rightWidth := formatSuggestions(suggestions, maxWidth)
 	// +1 means a width of scrollbar.
 	width++
 
@@ -109,6 +111,12 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 		windowHeight = int(completions.max)
 	}
 	formatted = formatted[completions.verticalScroll : completions.verticalScroll+windowHeight]
+	selected := completions.selected - completions.verticalScroll
+	if selected >= 0 && completions.expandDescriptions {
+		selectedSuggest := suggestions[completions.selected]
+		formatted = r.expandDescription(formatted, selectedSuggest.Description, selected, int(completions.max), rightWidth, leftWidth)
+		windowHeight = len(formatted)
+	}
 	r.prepareArea(windowHeight)
 
 	cursor := runewidth.StringWidth(prefix) + runewidth.StringWidth(buf.Document().TextBeforeCursor())
@@ -129,7 +137,6 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 		return scrollbarTop <= row && row <= scrollbarTop+scrollbarHeight
 	}
 
-	selected := completions.selected - completions.verticalScroll
 	r.out.SetColor(White, Cyan, false)
 	for i := 0; i < windowHeight; i++ {
 		r.out.CursorDown(1)
@@ -140,7 +147,7 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 		}
 		r.out.WriteStr(formatted[i].Text)
 
-		if i == selected {
+		if i == selected && !completions.expandDescriptions {
 			r.out.SetColor(r.selectedDescriptionTextColor, r.selectedDescriptionBGColor, false)
 		} else {
 			r.out.SetColor(r.descriptionTextColor, r.descriptionBGColor, false)
@@ -165,6 +172,53 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 
 	r.out.CursorUp(windowHeight)
 	r.out.SetColor(DefaultColor, DefaultColor, false)
+}
+
+func (r *Render) expandDescription(formatted []Suggest, expand string, selected int, mh int, mw int, leftWidth int) []Suggest {
+	if mh <= 0 || mw <= 2 {
+		return formatted
+	}
+
+	mw = mw - 2
+	reformatted := make([]Suggest, 0, len(formatted))
+	wrapped := strings.Split(wrap(expand, uint(mw)), "\n")
+	lf := len(formatted)
+	lw := len(wrapped)
+	l := lf
+	if lw > lf {
+		l = lw
+	}
+	if l > mh {
+		l = mh
+	}
+	for i := 0; i < l; i++ {
+		var desc string
+		if i < lw {
+			if i == l-1 && lw > l {
+				desc = "..."
+			} else {
+				desc = wrapped[i]
+			}
+			w := mw - len(desc)
+			if w < 0 {
+				w = 0
+			}
+			pad := strings.Repeat(" ", w)
+			desc = " " + desc + pad + " "
+		} else {
+			desc = strings.Repeat(" ", mw+2)
+		}
+		text := strings.Repeat(" ", leftWidth)
+		if i < lf {
+			text = formatted[i].Text
+		}
+		reformatted = append(reformatted, Suggest{
+			Text:        text,
+			Description: desc,
+		})
+	}
+
+	return reformatted
 }
 
 // Render renders to the console.
@@ -323,7 +377,13 @@ func (r *Render) toPos(cursor int) (x, y int) {
 }
 
 func (r *Render) lineWrap(cursor int) {
-	if runtime.GOOS != "windows" && cursor > 0 && cursor%int(r.col) == 0 {
+	if runtime.GOOS == "windows" {
+		// WT_SESSION indicates Windows Terminal, which is more rational than the older cmd or ps terminals
+		if _, ok := os.LookupEnv("WT_SESSION"); !ok {
+			return
+		}
+	}
+	if cursor > 0 && cursor%int(r.col) == 0 {
 		r.out.WriteRaw([]byte{'\n'})
 	}
 }
@@ -337,4 +397,86 @@ func clamp(high, low, x float64) float64 {
 	default:
 		return x
 	}
+}
+
+func wrap(s string, lim uint) string {
+	esc := false
+
+	init := make([]byte, 0, len(s))
+	buf := bytes.NewBuffer(init)
+
+	var current uint
+	var wordBuf, spaceBuf bytes.Buffer
+	var wordBufLen, spaceBufLen uint
+
+	for _, char := range s {
+		if char == '\x1b' {
+			esc = true
+			wordBuf.WriteRune(char)
+			continue
+		}
+		if esc {
+			if char == 'm' {
+				esc = false
+			}
+			wordBuf.WriteRune(char)
+			continue
+		}
+		if char == '\n' {
+			if wordBuf.Len() == 0 {
+				if current+spaceBufLen > lim {
+					current = 0
+				} else {
+					current += spaceBufLen
+					spaceBuf.WriteTo(buf)
+				}
+				spaceBuf.Reset()
+				spaceBufLen = 0
+			} else {
+				current += spaceBufLen + wordBufLen
+				spaceBuf.WriteTo(buf)
+				spaceBuf.Reset()
+				spaceBufLen = 0
+				wordBuf.WriteTo(buf)
+				wordBuf.Reset()
+				wordBufLen = 0
+			}
+			buf.WriteRune(char)
+			current = 0
+		} else if unicode.IsSpace(char) {
+			if spaceBuf.Len() == 0 || wordBuf.Len() > 0 {
+				current += spaceBufLen + wordBufLen
+				spaceBuf.WriteTo(buf)
+				spaceBuf.Reset()
+				spaceBufLen = 0
+				wordBuf.WriteTo(buf)
+				wordBuf.Reset()
+				wordBufLen = 0
+			}
+
+			spaceBuf.WriteRune(char)
+			spaceBufLen++
+		} else {
+			wordBuf.WriteRune(char)
+			wordBufLen++
+
+			if current+wordBufLen+spaceBufLen > lim && wordBufLen < lim {
+				buf.WriteRune('\n')
+				current = 0
+				spaceBuf.Reset()
+				spaceBufLen = 0
+			}
+		}
+	}
+
+	if wordBuf.Len() == 0 {
+		if current+spaceBufLen <= lim {
+			spaceBuf.WriteTo(buf)
+		}
+	} else {
+		spaceBuf.WriteTo(buf)
+		wordBuf.WriteTo(buf)
+	}
+
+	return buf.String()
 }

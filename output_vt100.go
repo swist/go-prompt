@@ -2,7 +2,11 @@ package prompt
 
 import (
 	"bytes"
+	"fmt"
+	"math"
 	"strconv"
+
+	"github.com/jwalton/go-supportscolor"
 )
 
 // VT100Writer generates VT100 escape sequences.
@@ -213,7 +217,7 @@ func (w *VT100Writer) SetColor(fg, bg Color, bold bool) {
 	if bold {
 		w.SetDisplayAttributes(fg, bg, DisplayBold)
 	} else {
-		// If using `DisplayDefualt`, it will be broken in some environment.
+		// If using `DisplayDefault`, it will be broken in some environment.
 		// Details are https://github.com/c-bata/go-prompt/pull/85
 		w.SetDisplayAttributes(fg, bg, DisplayReset)
 	}
@@ -234,17 +238,88 @@ func (w *VT100Writer) SetDisplayAttributes(fg, bg Color, attrs ...DisplayAttribu
 		w.WriteRaw([]byte{separator})
 	}
 
-	f, ok := foregroundANSIColors[fg]
-	if !ok {
-		f = foregroundANSIColors[DefaultColor]
-	}
+	f := w.color(fg, false)
 	w.WriteRaw(f)
 	w.WriteRaw([]byte{separator})
-	b, ok := backgroundANSIColors[bg]
-	if !ok {
-		b = backgroundANSIColors[DefaultColor]
-	}
+	b := w.color(bg, true)
 	w.WriteRaw(b)
+}
+
+func (w *VT100Writer) color(c Color, bg bool) []byte {
+	ansi := foregroundANSIColors
+	first := 3
+	if bg {
+		ansi = backgroundANSIColors
+		first = 4
+	}
+	var code []byte
+	if c >= 0 {
+		red, green, blue := uint8(c>>16), uint8(c>>8), uint8(c)
+		if supportscolor.Stdout().Has16m {
+			code = []byte(fmt.Sprintf("%d8;2;%d;%d;%d", first, red, green, blue))
+		} else if supportscolor.Stdout().Has256 && c < 256 {
+			c256 := rgbToAnsi256(red, green, blue)
+			code = []byte(fmt.Sprintf("%d8;5;%d", first, c256))
+		} else {
+			c16 := ansi256ToAnsi(rgbToAnsi256(red, green, blue))
+			if bg {
+				c16 += 10
+			}
+			code = []byte(fmt.Sprintf("%d", c16))
+		}
+	} else {
+		ok := false
+		code, ok = ansi[c]
+		if !ok {
+			code = ansi[DefaultColor]
+		}
+	}
+	return code
+}
+
+// https://github.com/jwalton/gchalk/blob/0e981f4720b458a38658594c55b6e6d01a8b088f/pkg/ansistyles/ansistyles.go#L408
+func rgbToAnsi256(red uint8, green uint8, blue uint8) uint8 {
+	if red == green && green == blue {
+		if red < 8 {
+			return 16
+		}
+		if red > 248 {
+			return 231
+		}
+		return uint8(math.Round(((float64(red)-8)/247)*24)) + 232
+	}
+	return 16 +
+		uint8(
+			(36*math.Round(float64(red)/255*5))+
+				(6*math.Round(float64(green)/255*5))+
+				math.Round(float64(blue)/255*5))
+}
+
+// https://github.com/jwalton/gchalk/blob/master/pkg/ansistyles/ansistyles.go#L488
+func ansi256ToAnsi(code uint8) uint8 {
+	return ansi256ToAnsi16Lut[code]
+}
+
+// https://github.com/jwalton/gchalk/blob/master/pkg/ansistyles/ansi256lut.go
+var ansi256ToAnsi16Lut = []uint8{
+	// Standard colors
+	30, 31, 32, 33, 34, 35, 36, 37, 90, 91, 92, 93, 94, 95, 96, 97,
+	// Colors
+	30, 30, 30, 34, 34, 34, 30, 30, 34, 34, 34, 34, 32, 32, 90, 34, 34, 34,
+	32, 32, 36, 36, 36, 36, 32, 32, 36, 36, 36, 36, 32, 32, 92, 36, 36, 36,
+	30, 30, 30, 34, 34, 34, 30, 30, 90, 34, 34, 34, 32, 90, 90, 90, 94, 94,
+	32, 32, 90, 36, 36, 94, 32, 32, 92, 36, 36, 96, 32, 92, 92, 92, 96, 96,
+	30, 30, 90, 90, 34, 94, 31, 90, 90, 90, 94, 94, 90, 90, 90, 90, 94, 94,
+	33, 90, 90, 90, 94, 94, 33, 92, 92, 92, 96, 96, 92, 92, 92, 92, 96, 96,
+	31, 31, 90, 35, 35, 35, 31, 31, 90, 35, 35, 35, 31, 90, 90, 90, 94, 94,
+	33, 33, 90, 37, 37, 94, 33, 33, 92, 37, 37, 37, 33, 92, 92, 92, 37, 96,
+	31, 31, 31, 35, 35, 35, 31, 31, 91, 35, 35, 35, 31, 91, 91, 35, 35, 95,
+	33, 33, 91, 37, 37, 95, 33, 33, 93, 37, 37, 37, 33, 93, 93, 93, 37, 97,
+	31, 31, 91, 35, 35, 35, 31, 91, 91, 35, 35, 95, 31, 91, 91, 91, 95, 95,
+	33, 91, 91, 91, 95, 95, 33, 93, 93, 93, 37, 97, 33, 93, 93, 93, 97, 97,
+	// Greyscale
+	30, 30, 30, 30, 30, 90, 90, 90, 90, 90, 90, 90,
+	90, 90, 90, 37, 37, 37, 37, 37, 37, 37, 97, 97,
 }
 
 var displayAttributeParameters = map[DisplayAttribute][]byte{

@@ -53,6 +53,14 @@ func OptionCompletionWordSeparator(x string) Option {
 	}
 }
 
+// OptionCompletionExpandDescriptions to enable suggestion description expansion.
+func OptionCompletionExpandDescriptions(x bool) Option {
+	return func(p *Prompt) error {
+		p.completion.expandDescriptions = x
+		return nil
+	}
+}
+
 // OptionLivePrefix to change the prefix dynamically by callback function
 func OptionLivePrefix(f func() (prefix string, useLivePrefix bool)) Option {
 	return func(p *Prompt) error {
@@ -274,13 +282,20 @@ func OptionSetLexer(fn LexerFunc) Option {
 	}
 }
 
+// OptionTtyFallbackErrors list of error strings to consider when falling back when opening tty fd fails
+func OptionTtyFallbackErrors(errors []string) Option {
+	return func(p *Prompt) error {
+		ttyFallbackErrors = errors
+		return nil
+	}
+}
+
 // New returns a Prompt with powerful auto-completion.
 func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 	defaultWriter := NewStdoutWriter()
 	registerConsoleWriter(defaultWriter)
 
 	pt := &Prompt{
-		in: NewStandardInputParser(),
 		renderer: &Render{
 			prefix:                       "> ",
 			out:                          defaultWriter,
@@ -305,7 +320,7 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 		buf:         NewBuffer(),
 		executor:    executor,
 		history:     NewHistory(),
-		lexer: NewLexer(),
+		lexer:       NewLexer(),
 		completion:  NewCompletionManager(completer, 6),
 		keyBindMode: EmacsKeyBind, // All the above assume that bash is running in the default Emacs setting
 	}
@@ -315,5 +330,9 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 			panic(err)
 		}
 	}
+
+	pt.in = NewStandardInputParser()
+	pt.r = NewStandardInputReader(pt.in)
+
 	return pt
 }

@@ -1,9 +1,10 @@
 package prompt
 
 import (
+	"bufio"
 	"bytes"
 	"os"
-	"time"
+	"regexp"
 
 	"github.com/c-bata/go-prompt/internal/debug"
 )
@@ -24,11 +25,12 @@ type Completer func(Document) []Suggest
 // Prompt is core struct of go-prompt.
 type Prompt struct {
 	in                ConsoleParser
+	r                 *bufio.Reader
 	buf               *Buffer
 	renderer          *Render
 	executor          Executor
 	history           *History
-	lexer *Lexer
+	lexer             *Lexer
 	completion        *CompletionManager
 	keyBindings       []KeyBind
 	ASCIICodeBindings []ASCIICodeBind
@@ -36,6 +38,7 @@ type Prompt struct {
 	completionOnDown  bool
 	exitChecker       ExitChecker
 	skipTearDown      bool
+	lastBytes         []byte
 }
 
 // Exec is the struct contains user input context.
@@ -43,23 +46,29 @@ type Exec struct {
 	input string
 }
 
+func (p *Prompt) Buffer(line string) {
+	p.buf = NewBufferWithLine(line)
+}
+
+func (p *Prompt) Refresh(update bool, lexer *Lexer) {
+	if update {
+		p.completion.Update(*p.buf.Document())
+	}
+	p.renderer.Render(p.buf, p.completion, lexer)
+}
+
 // Run starts prompt.
 func (p *Prompt) Run() {
 	p.skipTearDown = false
 	defer debug.Teardown()
-	debug.Log("start prompt")
+	debug.Log("Run start prompt")
 	p.setUp()
 	defer p.tearDown()
 
-	if p.completion.showAtStart {
-		p.completion.Update(*p.buf.Document())
-	}
+	p.Refresh(p.completion.showAtStart, p.lexer)
 
-	p.renderer.Render(p.buf, p.completion, p.lexer)
-
-	bufCh := make(chan []byte, 128)
-	stopReadBufCh := make(chan struct{})
-	go p.readBuffer(bufCh, stopReadBufCh)
+	bufCh := make(chan []byte)
+	go p.readLine(bufCh)
 
 	exitCh := make(chan int)
 	winSizeCh := make(chan *WinSize)
@@ -69,51 +78,68 @@ func (p *Prompt) Run() {
 	for {
 		select {
 		case b := <-bufCh:
-			if shouldExit, e := p.feed(b); shouldExit {
-				p.renderer.BreakLine(p.buf, p.lexer)
-				stopReadBufCh <- struct{}{}
-				stopHandleSignalCh <- struct{}{}
-				return
-			} else if e != nil {
-				// Stop goroutine to run readBuffer function
-				stopReadBufCh <- struct{}{}
-				stopHandleSignalCh <- struct{}{}
-
-				// Unset raw mode
-				// Reset to Blocking mode because returned EAGAIN when still set non-blocking mode.
-				debug.AssertNoError(p.in.TearDown())
-				p.executor(e.input)
-
-				p.completion.Update(*p.buf.Document())
-
-				p.renderer.Render(p.buf, p.completion, p.lexer)
-
-				if p.exitChecker != nil && p.exitChecker(e.input, true) {
-					p.skipTearDown = true
+			for {
+				shouldExit, e, bufLeft, ended := p.feed(b)
+				if shouldExit {
+					p.renderer.BreakLine(p.buf, p.lexer)
+					stopHandleSignalCh <- struct{}{}
 					return
+				} else if e != nil {
+					stopHandleSignalCh <- struct{}{}
+
+					// Unset raw mode
+					// Reset to Blocking mode because returned EAGAIN when still set non-blocking mode.
+					debug.AssertNoError(p.in.TearDown())
+
+					p.executor(e.input)
+					p.Refresh(true, p.lexer)
+
+					if p.exitChecker != nil && p.exitChecker(e.input, true) {
+						p.skipTearDown = true
+						return
+					}
+					// Set raw mode
+					debug.AssertNoError(p.in.Setup())
+					go p.handleSignals(exitCh, winSizeCh, stopHandleSignalCh)
+				} else {
+					p.Refresh(true, p.lexer)
 				}
-				// Set raw mode
-				debug.AssertNoError(p.in.Setup())
-				go p.readBuffer(bufCh, stopReadBufCh)
-				go p.handleSignals(exitCh, winSizeCh, stopHandleSignalCh)
-			} else {
-				p.completion.Update(*p.buf.Document())
-				p.renderer.Render(p.buf, p.completion, p.lexer)
+				if ended {
+					go p.readLine(bufCh)
+				}
+				if len(bufLeft) == 0 {
+					break
+				}
+				b = bufLeft
 			}
 		case w := <-winSizeCh:
 			p.renderer.UpdateWinSize(w)
-			p.renderer.Render(p.buf, p.completion, p.lexer)
+			p.Refresh(false, p.lexer)
 		case code := <-exitCh:
 			p.renderer.BreakLine(p.buf, p.lexer)
 			p.tearDown()
 			os.Exit(code)
-		default:
-			time.Sleep(10 * time.Millisecond)
 		}
 	}
 }
 
-func (p *Prompt) feed(b []byte) (shouldExit bool, exec *Exec) {
+func (p *Prompt) feed(buf []byte) (shouldExit bool, exec *Exec, bufLeft []byte, ended bool) {
+	idx := bytes.IndexAny(buf, string([]byte{0xa, 0xd}))
+	var b []byte
+	if idx == 0 {
+		b = []byte{buf[0]}
+		if len(buf) > 1 {
+			bufLeft = buf[1:]
+		}
+	} else if idx != -1 {
+		b = buf[0:idx]
+		bufLeft = buf[idx:]
+	} else {
+		b = buf
+	}
+
+	defer func() { p.lastBytes = b }()
+
 	key := GetKey(b)
 	p.buf.lastKeyStroke = key
 	// completion
@@ -122,12 +148,16 @@ func (p *Prompt) feed(b []byte) (shouldExit bool, exec *Exec) {
 
 	switch key {
 	case Enter, ControlJ, ControlM:
-		p.renderer.BreakLine(p.buf, p.lexer)
-
-		exec = &Exec{input: p.buf.Text()}
-		p.buf = NewBuffer()
-		if exec.input != "" {
-			p.history.Add(exec.input)
+		match := regexp.MustCompile(`(\\+)$`).FindStringSubmatch(p.buf.Text())
+		if len(match) == 2 {
+			p.buf.DeleteBeforeCursor(len(match[1]))
+		} else {
+			p.renderer.BreakLine(p.buf, p.lexer)
+			exec = &Exec{input: p.buf.Text()}
+			p.buf = NewBuffer()
+			if exec.input != "" {
+				p.history.Add(exec.input)
+			}
 		}
 	case ControlC:
 		p.renderer.BreakLine(p.buf, p.lexer)
@@ -151,6 +181,9 @@ func (p *Prompt) feed(b []byte) (shouldExit bool, exec *Exec) {
 			shouldExit = true
 			return
 		}
+	case ControlS:
+		ended = true
+		return
 	case NotDefined:
 		if p.handleASCIICodeBinding(b) {
 			return
@@ -233,54 +266,60 @@ func (p *Prompt) handleASCIICodeBinding(b []byte) bool {
 // Input just returns user input text.
 func (p *Prompt) Input() string {
 	defer debug.Teardown()
-	debug.Log("start prompt")
+	debug.Log("Input start prompt")
 	p.setUp()
 	defer p.tearDown()
 
-	if p.completion.showAtStart {
-		p.completion.Update(*p.buf.Document())
-	}
+	p.Refresh(p.completion.showAtStart, p.lexer)
 
-	p.renderer.Render(p.buf, p.completion, p.lexer)
-	bufCh := make(chan []byte, 128)
-	stopReadBufCh := make(chan struct{})
-	go p.readBuffer(bufCh, stopReadBufCh)
+	bufCh := make(chan []byte)
+	go p.readLine(bufCh)
 
 	for {
 		select {
 		case b := <-bufCh:
-			if shouldExit, e := p.feed(b); shouldExit {
+			if shouldExit, e, _, _ := p.feed(b); shouldExit {
 				p.renderer.BreakLine(p.buf, p.lexer)
-				stopReadBufCh <- struct{}{}
 				return ""
 			} else if e != nil {
-				// Stop goroutine to run readBuffer function
-				stopReadBufCh <- struct{}{}
 				return e.input
 			} else {
-				p.completion.Update(*p.buf.Document())
-				p.renderer.Render(p.buf, p.completion, p.lexer)
+				p.Refresh(true, p.lexer)
 			}
-		default:
-			time.Sleep(10 * time.Millisecond)
 		}
 	}
 }
 
-func (p *Prompt) readBuffer(bufCh chan []byte, stopCh chan struct{}) {
-	debug.Log("start reading buffer")
-	for {
-		select {
-		case <-stopCh:
-			debug.Log("stop reading buffer")
-			return
-		default:
-			if b, err := p.in.Read(); err == nil && !(len(b) == 1 && b[0] == 0) {
-				bufCh <- b
+func (p *Prompt) readChunk() ([]byte, error) {
+	b := make([]byte, maxReadBytes)
+	n, err := p.r.Read(b)
+	return b[:n], err
+}
+
+func (p *Prompt) readLine(bufCh chan []byte) {
+	debug.Log("start reading input until end of line")
+
+	var last byte
+	for read := true; read; {
+		if chunk, err := p.readChunk(); err == nil && !(len(chunk) == 1 && chunk[0] == 0) {
+			start := 0
+			for i, b := range chunk {
+				key := GetKey([]byte{b})
+				isBreak := key == Enter || key == ControlJ || key == ControlM
+				if isBreak && last != '\\' {
+					bufCh <- chunk[start:i]
+					bufCh <- []byte{b}
+					start = i + 1
+					read = false
+				}
+				last = b
 			}
+			bufCh <- chunk[start:]
 		}
-		time.Sleep(10 * time.Millisecond)
 	}
+
+	bufCh <- GetCode(ControlS)
+	debug.Log("stopped reading input after reading end of line")
 }
 
 func (p *Prompt) setUp() {
