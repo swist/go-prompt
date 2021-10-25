@@ -50,11 +50,11 @@ func (p *Prompt) Buffer(line string) {
 	p.buf = NewBufferWithLine(line)
 }
 
-func (p *Prompt) Refresh(update bool, lexer *Lexer) {
+func (p *Prompt) Refresh(update bool) {
 	if update {
 		p.completion.Update(*p.buf.Document())
 	}
-	p.renderer.Render(p.buf, p.completion, lexer)
+	p.renderer.Render(p.buf, p.completion, p.lexer)
 }
 
 // Run starts prompt.
@@ -65,7 +65,7 @@ func (p *Prompt) Run() {
 	p.setUp()
 	defer p.tearDown()
 
-	p.Refresh(p.completion.showAtStart, p.lexer)
+	p.Refresh(p.completion.showAtStart)
 
 	bufCh := make(chan []byte)
 	go p.readLine(bufCh)
@@ -92,7 +92,7 @@ func (p *Prompt) Run() {
 					debug.AssertNoError(p.in.TearDown())
 
 					p.executor(e.input)
-					p.Refresh(true, p.lexer)
+					p.Refresh(true)
 
 					if p.exitChecker != nil && p.exitChecker(e.input, true) {
 						p.skipTearDown = true
@@ -102,7 +102,7 @@ func (p *Prompt) Run() {
 					debug.AssertNoError(p.in.Setup())
 					go p.handleSignals(exitCh, winSizeCh, stopHandleSignalCh)
 				} else {
-					p.Refresh(true, p.lexer)
+					p.Refresh(true)
 				}
 				if ended {
 					go p.readLine(bufCh)
@@ -114,7 +114,7 @@ func (p *Prompt) Run() {
 			}
 		case w := <-winSizeCh:
 			p.renderer.UpdateWinSize(w)
-			p.Refresh(false, p.lexer)
+			p.Refresh(false)
 		case code := <-exitCh:
 			p.renderer.BreakLine(p.buf, p.lexer)
 			p.tearDown()
@@ -270,7 +270,7 @@ func (p *Prompt) Input() string {
 	p.setUp()
 	defer p.tearDown()
 
-	p.Refresh(p.completion.showAtStart, p.lexer)
+	p.Refresh(p.completion.showAtStart)
 
 	bufCh := make(chan []byte)
 	go p.readLine(bufCh)
@@ -284,7 +284,7 @@ func (p *Prompt) Input() string {
 			} else if e != nil {
 				return e.input
 			} else {
-				p.Refresh(true, p.lexer)
+				p.Refresh(true)
 			}
 		}
 	}
