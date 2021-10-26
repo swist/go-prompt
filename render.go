@@ -258,7 +258,7 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 			a := strings.SplitAfter(s, v.Text)
 			s = strings.TrimPrefix(s, a[0])
 
-			r.out.SetColor(v.Color, r.inputBGColor, false)
+			r.out.SetColor(v.TextColor, v.BGColor, false)
 			r.out.WriteStr(a[0])
 		}
 	} else {
@@ -294,7 +294,7 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 				a := strings.SplitAfter(s, v.Text)
 				s = strings.TrimPrefix(s, a[0])
 
-				r.out.SetColor(v.Color, r.inputBGColor, false)
+				r.out.SetColor(v.TextColor, v.BGColor, false)
 				r.out.WriteStr(a[0])
 			}
 		} else {
@@ -328,7 +328,7 @@ func (r *Render) BreakLine(buffer *Buffer, lexer *Lexer) {
 			a := strings.SplitAfter(s, v.Text)
 			s = strings.TrimPrefix(s, a[0])
 
-			r.out.SetColor(v.Color, r.inputBGColor, false)
+			r.out.SetColor(v.TextColor, v.BGColor, false)
 			r.out.WriteStr(a[0])
 		}
 	} else {
