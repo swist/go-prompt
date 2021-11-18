@@ -13,13 +13,14 @@ import (
 
 // Render to render prompt information from state of Buffer.
 type Render struct {
-	out                ConsoleWriter
-	prefix             string
-	livePrefixCallback func() (prefix string, useLivePrefix bool)
-	breakLineCallback  func(*Document)
-	title              string
-	row                uint16
-	col                uint16
+	out                 ConsoleWriter
+	prefix              string
+	livePrefixCallback  func() (prefix string, useLivePrefix bool)
+	breakLineCallback   func(*Document)
+	title               string
+	row                 uint16
+	col                 uint16
+	renderPrefixAtStart bool
 
 	previousCursor int
 
@@ -248,7 +249,11 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 	r.out.HideCursor()
 	defer r.out.ShowCursor()
 
-	r.renderPrefix()
+	if r.renderPrefixAtStart {
+		r.renderPrefix()
+	} else {
+		r.renderPrefixAtStart = true
+	}
 
 	if lexer.IsEnabled {
 		processed := lexer.Process(line)

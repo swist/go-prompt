@@ -37,6 +37,14 @@ func OptionPrefix(x string) Option {
 	}
 }
 
+// OptionRenderPrefix to set whether prefix renders immediately.
+func OptionRenderPrefixAtStart(x bool) Option {
+	return func(p *Prompt) error {
+		p.renderer.renderPrefixAtStart = x
+		return nil
+	}
+}
+
 // OptionInitialBufferText to set the initial buffer text
 func OptionInitialBufferText(x string) Option {
 	return func(p *Prompt) error {
@@ -300,6 +308,7 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 			prefix:                       "> ",
 			out:                          defaultWriter,
 			livePrefixCallback:           func() (string, bool) { return "", false },
+			renderPrefixAtStart:          true,
 			prefixTextColor:              Blue,
 			prefixBGColor:                DefaultColor,
 			inputTextColor:               DefaultColor,
