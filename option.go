@@ -1,5 +1,7 @@
 package prompt
 
+import "time"
+
 // Option is the type to replace default parameters.
 // prompt.New accepts any number of options (this is functional option pattern).
 type Option func(prompt *Prompt) error
@@ -286,6 +288,16 @@ func OptionSetExitCheckerOnInput(fn ExitChecker) Option {
 func OptionSetLexer(fn LexerFunc) Option {
 	return func(p *Prompt) error {
 		p.lexer.SetLexerFunction(fn)
+		return nil
+	}
+}
+
+// OptionRefreshTickerInterval enables a refresh ticker with the given interval.
+func OptionRefreshTickerInterval(interval time.Duration) Option {
+	return func(p *Prompt) error {
+		if interval > 0 {
+			p.ticker = time.NewTicker(interval)
+		}
 		return nil
 	}
 }

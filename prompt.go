@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"os"
 	"regexp"
+	"time"
 
 	"github.com/c-bata/go-prompt/internal/debug"
 )
@@ -39,6 +40,7 @@ type Prompt struct {
 	exitChecker       ExitChecker
 	skipTearDown      bool
 	lastBytes         []byte
+	ticker            *time.Ticker
 }
 
 // Exec is the struct contains user input context.
@@ -74,6 +76,11 @@ func (p *Prompt) Run() {
 	winSizeCh := make(chan *WinSize)
 	stopHandleSignalCh := make(chan struct{})
 	go p.handleSignals(exitCh, winSizeCh, stopHandleSignalCh)
+
+	var tickCh <-chan time.Time
+	if p.ticker != nil {
+		tickCh = p.ticker.C
+	}
 
 	for {
 		select {
@@ -119,6 +126,8 @@ func (p *Prompt) Run() {
 			p.renderer.BreakLine(p.buf, p.lexer)
 			p.tearDown()
 			os.Exit(code)
+		case <-tickCh:
+			p.Refresh(true)
 		}
 	}
 }
@@ -333,4 +342,7 @@ func (p *Prompt) tearDown() {
 		debug.AssertNoError(p.in.TearDown())
 	}
 	p.renderer.TearDown()
+	if p.ticker != nil {
+		p.ticker.Stop()
+	}
 }
