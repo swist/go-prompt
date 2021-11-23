@@ -293,11 +293,19 @@ func OptionSetLexer(fn LexerFunc) Option {
 }
 
 // OptionRefreshTickerInterval enables a refresh ticker with the given interval.
-func OptionRefreshTickerInterval(interval time.Duration) Option {
+func OptionRefreshInterval(interval time.Duration) Option {
 	return func(p *Prompt) error {
 		if interval > 0 {
-			p.ticker = time.NewTicker(interval)
+			p.refreshTicker = time.NewTicker(interval)
 		}
+		return nil
+	}
+}
+
+// OptionRefreshTickerInterval enables a refresh ticker with the given interval.
+func OptionRefreshChecker(fn RefreshChecker) Option {
+	return func(p *Prompt) error {
+		p.refreshChecker = fn
 		return nil
 	}
 }

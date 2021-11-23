@@ -20,6 +20,9 @@ type Executor func(string)
 // Exit means exit go-prompt (not the overall Go program)
 type ExitChecker func(in string, breakline bool) bool
 
+// RefreshChecker is called to determine whether or not to refresh the prompt.
+type RefreshChecker func(d *Document) bool
+
 // Completer should return the suggest item from Document.
 type Completer func(Document) []Suggest
 
@@ -40,7 +43,8 @@ type Prompt struct {
 	exitChecker       ExitChecker
 	skipTearDown      bool
 	lastBytes         []byte
-	ticker            *time.Ticker
+	refreshTicker     *time.Ticker
+	refreshChecker    RefreshChecker
 }
 
 // Exec is the struct contains user input context.
@@ -78,9 +82,11 @@ func (p *Prompt) Run() {
 	go p.handleSignals(exitCh, winSizeCh, stopHandleSignalCh)
 
 	var tickCh <-chan time.Time
-	if p.ticker != nil {
-		tickCh = p.ticker.C
+	if p.refreshTicker != nil {
+		tickCh = p.refreshTicker.C
 	}
+
+	nextRefresh := false
 
 	for {
 		select {
@@ -127,7 +133,16 @@ func (p *Prompt) Run() {
 			p.tearDown()
 			os.Exit(code)
 		case <-tickCh:
-			p.Refresh(true)
+			if p.refreshChecker == nil {
+				p.Refresh(true)
+			} else {
+				// Refreshes one additional time after p.refreshChecker returns false following a true check.
+				prevRefresh := nextRefresh
+				nextRefresh = p.refreshChecker(p.buf.Document())
+				if nextRefresh || prevRefresh {
+					p.Refresh(true)
+				}
+			}
 		}
 	}
 }
@@ -342,7 +357,7 @@ func (p *Prompt) tearDown() {
 		debug.AssertNoError(p.in.TearDown())
 	}
 	p.renderer.TearDown()
-	if p.ticker != nil {
-		p.ticker.Stop()
+	if p.refreshTicker != nil {
+		p.refreshTicker.Stop()
 	}
 }
