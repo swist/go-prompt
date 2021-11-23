@@ -15,8 +15,8 @@ import (
 type Render struct {
 	out                 ConsoleWriter
 	prefix              string
-	livePrefixCallback  func() (prefix string, useLivePrefix bool)
-	breakLineCallback   func(*Document)
+	livePrefixCallback  func(doc *Document, isBreak bool) (prefix string, useLivePrefix bool)
+	breakLineCallback   func(doc *Document)
 	title               string
 	row                 uint16
 	col                 uint16
@@ -53,16 +53,16 @@ func (r *Render) Setup() {
 
 // getCurrentPrefix to get current prefix.
 // If live-prefix is enabled, return live-prefix.
-func (r *Render) getCurrentPrefix() string {
-	if prefix, ok := r.livePrefixCallback(); ok {
+func (r *Render) getCurrentPrefix(buffer *Buffer, isBreak bool) string {
+	if prefix, ok := r.livePrefixCallback(buffer.Document(), isBreak); ok {
 		return prefix
 	}
 	return r.prefix
 }
 
-func (r *Render) renderPrefix() {
+func (r *Render) renderPrefix(buffer *Buffer, isBreak bool) {
 	r.out.SetColor(r.prefixTextColor, r.prefixBGColor, false)
-	r.out.WriteStr(r.getCurrentPrefix())
+	r.out.WriteStr(r.getCurrentPrefix(buffer, isBreak))
 	r.out.SetColor(DefaultColor, DefaultColor, false)
 	r.out.Flush()
 }
@@ -101,7 +101,7 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 	if len(suggestions) == 0 {
 		return
 	}
-	prefix := r.getCurrentPrefix()
+	prefix := r.getCurrentPrefix(buf, false)
 	maxWidth := int(r.col) - runewidth.StringWidth(prefix) - 1 // -1 means a width of scrollbar
 	formatted, width, leftWidth, rightWidth := formatSuggestions(suggestions, maxWidth)
 	// +1 means a width of scrollbar.
@@ -233,7 +233,7 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 	r.move(r.previousCursor, 0)
 
 	line := buffer.Text()
-	prefix := r.getCurrentPrefix()
+	prefix := r.getCurrentPrefix(buffer, false)
 	cursor := runewidth.StringWidth(prefix) + runewidth.StringWidth(line)
 
 	// prepare area
@@ -250,7 +250,7 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 	defer r.out.ShowCursor()
 
 	if r.renderPrefixAtStart {
-		r.renderPrefix()
+		r.renderPrefix(buffer, false)
 	} else {
 		r.renderPrefixAtStart = true
 	}
@@ -319,10 +319,11 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 // BreakLine to break line.
 func (r *Render) BreakLine(buffer *Buffer, lexer *Lexer) {
 	// Erasing and Render
-	cursor := runewidth.StringWidth(buffer.Document().TextBeforeCursor()) + runewidth.StringWidth(r.getCurrentPrefix())
+	prefix := r.getCurrentPrefix(buffer, true)
+	cursor := runewidth.StringWidth(buffer.Document().TextBeforeCursor()) + runewidth.StringWidth(prefix)
 	r.clear(cursor)
 
-	r.renderPrefix()
+	r.renderPrefix(buffer, true)
 
 	if lexer.IsEnabled {
 		processed := lexer.Process(buffer.Document().Text + "\n")

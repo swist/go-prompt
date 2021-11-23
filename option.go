@@ -72,7 +72,7 @@ func OptionCompletionExpandDescriptions(x bool) Option {
 }
 
 // OptionLivePrefix to change the prefix dynamically by callback function
-func OptionLivePrefix(f func() (prefix string, useLivePrefix bool)) Option {
+func OptionLivePrefix(f func(doc *Document, isBreak bool) (prefix string, useLivePrefix bool)) Option {
 	return func(p *Prompt) error {
 		p.renderer.livePrefixCallback = f
 		return nil
@@ -319,7 +319,7 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 		renderer: &Render{
 			prefix:                       "> ",
 			out:                          defaultWriter,
-			livePrefixCallback:           func() (string, bool) { return "", false },
+			livePrefixCallback:           func(*Document, bool) (string, bool) { return "", false },
 			renderPrefixAtStart:          true,
 			prefixTextColor:              Blue,
 			prefixBGColor:                DefaultColor,
