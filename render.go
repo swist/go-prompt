@@ -199,6 +199,9 @@ func (r *Render) expandDescription(formatted []Suggest, expand string, selected 
 				desc = "..."
 			} else {
 				desc = wrapped[i]
+				if len(desc) > mw {
+					desc = desc[:mw-3] + "..."
+				}
 			}
 			w := mw - len(desc)
 			if w < 0 {
