@@ -7,7 +7,7 @@ package prompt
 //go:generate stringer -type=Key
 type Key int
 
-// ASCIICode is the type contains Key and it's ascii byte array.
+// ASCIICode is the type contains Key and its ascii byte array.
 type ASCIICode struct {
 	Key       Key
 	ASCIICode []byte
@@ -73,6 +73,15 @@ const (
 	BackTab
 	Insert
 	Backspace
+
+	// TODO: Add more keys.
+	MetaB
+	MetaD
+	MetaF
+
+	// TODO: Add more keys.
+	MetaLeft
+	MetaRight
 
 	// Aliases.
 	Tab

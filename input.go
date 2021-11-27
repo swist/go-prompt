@@ -197,4 +197,11 @@ var ASCIISequences = []*ASCIICode{
 
 	{Key: Ignore, ASCIICode: []byte{0x1b, 0x5b, 0x45}}, // Xterm
 	{Key: Ignore, ASCIICode: []byte{0x1b, 0x5b, 0x46}}, // Linux console
+
+	{Key: MetaB, ASCIICode: []byte{0x1b, 0x62}},
+	{Key: MetaD, ASCIICode: []byte{0x1b, 0x64}},
+	{Key: MetaF, ASCIICode: []byte{0x1b, 0x66}},
+
+	{Key: MetaLeft, ASCIICode: []byte{0x1b, 0x1b, 0x5b, 0x44}},
+	{Key: MetaRight, ASCIICode: []byte{0x1b, 0x1b, 0x5b, 0x43}},
 }

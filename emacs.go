@@ -1,6 +1,8 @@
 package prompt
 
-import "github.com/c-bata/go-prompt/internal/debug"
+import (
+	"github.com/c-bata/go-prompt/internal/debug"
+)
 
 /*
 
@@ -30,16 +32,22 @@ Editing
 * [x] Ctrl + k   Cut the Line after the cursor to the clipboard.
 * [x] Ctrl + u   Cut/delete the Line before the cursor to the clipboard.
 
+* [x] Meta + d   Delete from cursor to the end of the current word
+* [x] Meta + ->  Move to the start of the next word
+* [x] Meta + f   Move to the start of the next word
+* [x] Meta + <-  Move to the start of the previous word
+* [x] Meta + b   Move to the start of the previous word
+
 * [ ] Ctrl + t   Swap the last two characters before the cursor (typo).
 * [ ] Esc  + t   Swap the last two words before the cursor.
 
-* [ ] ctrl + y   Paste the last thing to be cut (yank)
-* [ ] ctrl + _   Undo
+* [ ] Ctrl + y   Paste the last thing to be cut (yank)
+* [ ] Ctrl + _   Undo
 
 */
 
 var emacsKeyBindings = []KeyBind{
-	// Go to the End of the line
+	// Go to the end of the line
 	{
 		Key: ControlE,
 		Fn: func(buf *Buffer) {
@@ -55,7 +63,7 @@ var emacsKeyBindings = []KeyBind{
 			buf.CursorLeft(len(x))
 		},
 	},
-	// Cut the Line after the cursor
+	// Cut the line after the cursor
 	{
 		Key: ControlK,
 		Fn: func(buf *Buffer) {
@@ -63,7 +71,7 @@ var emacsKeyBindings = []KeyBind{
 			buf.Delete(len(x))
 		},
 	},
-	// Cut/delete the Line before the cursor
+	// Cut/delete the line before the cursor
 	{
 		Key: ControlU,
 		Fn: func(buf *Buffer) {
@@ -115,6 +123,41 @@ var emacsKeyBindings = []KeyBind{
 			consoleWriter.EraseScreen()
 			consoleWriter.CursorGoTo(0, 0)
 			debug.AssertNoError(consoleWriter.Flush())
+		},
+	},
+	// Delete from cursor to the end of the current word
+	{
+		Key: MetaD,
+		Fn: func(buf *Buffer) {
+			buf.Delete(len([]rune(buf.Document().GetWordAfterCursorWithSpace())))
+		},
+	},
+	// Move to the start of the previous word.
+	{
+		Key: MetaB,
+		Fn: func(buf *Buffer) {
+			buf.CursorLeft(len([]rune(buf.Document().GetWordBeforeCursorWithSpace())))
+		},
+	},
+	// Move to the start of the previous word.
+	{
+		Key: MetaLeft,
+		Fn: func(buf *Buffer) {
+			buf.CursorLeft(len([]rune(buf.Document().GetWordBeforeCursorWithSpace())))
+		},
+	},
+	// Move to the start of the next word.
+	{
+		Key: MetaF,
+		Fn: func(buf *Buffer) {
+			buf.CursorRight(len([]rune(buf.Document().GetWordAfterCursorWithSpace())))
+		},
+	},
+	// Move to the start of the next word.
+	{
+		Key: MetaRight,
+		Fn: func(buf *Buffer) {
+			buf.CursorRight(len([]rune(buf.Document().GetWordAfterCursorWithSpace())))
 		},
 	},
 }
