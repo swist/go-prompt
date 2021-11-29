@@ -15,6 +15,16 @@ const (
 	rightSuffix   = " "
 )
 
+type SuggestType string
+
+const (
+	SuggestTypeDefault = ""
+	SuggestTypeLabel   = "label"
+	SuggestTypeNote    = "note"
+	SuggestTypeWarning = "warning"
+	SuggestTypeError   = "error"
+)
+
 var (
 	leftMargin       = runewidth.StringWidth(leftPrefix + leftSuffix)
 	rightMargin      = runewidth.StringWidth(rightPrefix + rightSuffix)
@@ -25,7 +35,7 @@ var (
 type Suggest struct {
 	Text        string
 	Description string
-	Label       bool
+	Type        SuggestType
 	Context     interface{}             `json:"-"`
 	OnSelected  func(s Suggest) Suggest `json:"-"`
 	OnCommitted func(s Suggest) Suggest `json:"-"`
@@ -136,7 +146,7 @@ func (c *CompletionManager) update(skip func()) {
 		c.verticalScroll = len(c.tmp) - max
 	}
 
-	if c.selected > -1 && c.tmp[c.selected].Label {
+	if c.selected > -1 && c.tmp[c.selected].Type != SuggestTypeDefault {
 		skip()
 	}
 }
@@ -209,7 +219,7 @@ func formatSuggestions(suggests []Suggest, max int) ([]Suggest, int, int, int) {
 	right, rightWidth := formatTexts(right, max-leftWidth, rightPrefix, rightSuffix)
 
 	for i := 0; i < num; i++ {
-		new[i] = Suggest{Text: left[i], Description: right[i], Label: suggests[i].Label}
+		new[i] = Suggest{Text: left[i], Description: right[i], Type: suggests[i].Type}
 	}
 	return new, leftWidth + rightWidth, leftWidth, rightWidth
 }

@@ -45,6 +45,14 @@ type Render struct {
 	scrollbarBGColor             Color
 	statusBarTextColor           Color
 	statusBarBGColor             Color
+	labelTextColor               Color
+	labelBGColor                 Color
+	noteTextColor                Color
+	noteBGColor                  Color
+	warningTextColor             Color
+	warningBGColor               Color
+	errorTextColor               Color
+	errorBGColor                 Color
 }
 
 // Setup to initialize console output.
@@ -154,9 +162,9 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 		r.out.CursorDown(1)
 		if i == selected {
 			r.out.SetColor(r.selectedSuggestionTextColor, r.selectedSuggestionBGColor, true)
-		} else if formatted[i].Label {
-			// TODO: proper colors
-			r.out.SetColor(White, Blue, false)
+		} else if formatted[i].Type != SuggestTypeDefault {
+			textColor, bgColor := r.getSuggestionTypeColor(formatted[i].Type)
+			r.out.SetColor(textColor, bgColor, false)
 		} else {
 			r.out.SetColor(r.suggestionTextColor, r.suggestionBGColor, false)
 		}
@@ -164,9 +172,9 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 
 		if i == selected && !completions.expandDescriptions {
 			r.out.SetColor(r.selectedDescriptionTextColor, r.selectedDescriptionBGColor, false)
-		} else if formatted[i].Label && (!completions.expandDescriptions || selected < 0) {
-			// TODO: proper colors
-			r.out.SetColor(White, Blue, false)
+		} else if formatted[i].Type != SuggestTypeDefault && (!completions.expandDescriptions || selected < 0) {
+			textColor, bgColor := r.getSuggestionTypeColor(formatted[i].Type)
+			r.out.SetColor(textColor, bgColor, false)
 		} else {
 			r.out.SetColor(r.descriptionTextColor, r.descriptionBGColor, false)
 		}
@@ -190,6 +198,21 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 
 	r.out.CursorUp(windowHeight)
 	r.out.SetColor(DefaultColor, DefaultColor, false)
+}
+
+func (r *Render) getSuggestionTypeColor(typ SuggestType) (textColor, bgColor Color) {
+	switch typ {
+	case SuggestTypeLabel:
+		return r.labelTextColor, r.labelBGColor
+	case SuggestTypeNote:
+		return r.noteTextColor, r.noteBGColor
+	case SuggestTypeWarning:
+		return r.warningTextColor, r.warningBGColor
+	case SuggestTypeError:
+		return r.errorTextColor, r.errorBGColor
+	default:
+		return r.suggestionTextColor, r.suggestionBGColor
+	}
 }
 
 func (r *Render) expandDescription(formatted []Suggest, expand string, selected int, mh int, mw int, leftWidth int) []Suggest {
@@ -236,7 +259,7 @@ func (r *Render) expandDescription(formatted []Suggest, expand string, selected 
 		reformatted = append(reformatted, Suggest{
 			Text:        text,
 			Description: desc,
-			Label:       formatted[i].Label,
+			Type:        formatted[i].Type,
 		})
 	}
 
