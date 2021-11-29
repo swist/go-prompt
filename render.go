@@ -303,6 +303,9 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 
 			for _, v := range processed {
 				a := strings.SplitAfter(s, v.Text)
+				if len(a) == 0 {
+					continue
+				}
 				s = strings.TrimPrefix(s, a[0])
 
 				r.out.SetColor(v.TextColor, v.BGColor, false)
