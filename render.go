@@ -45,14 +45,14 @@ type Render struct {
 	scrollbarBGColor             Color
 	statusBarTextColor           Color
 	statusBarBGColor             Color
-	labelTextColor               Color
-	labelBGColor                 Color
-	noteTextColor                Color
-	noteBGColor                  Color
-	warningTextColor             Color
-	warningBGColor               Color
-	errorTextColor               Color
-	errorBGColor                 Color
+	suggestTypeLabelTextColor    Color
+	suggestTypeLabelBGColor      Color
+	suggestTypeNoteTextColor     Color
+	suggestTypeNoteBGColor       Color
+	suggestTypeWarningTextColor  Color
+	suggestTypeWarningBGColor    Color
+	suggestTypeErrorTextColor    Color
+	suggestTypeErrorBGColor      Color
 }
 
 // Setup to initialize console output.
@@ -203,13 +203,13 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 func (r *Render) getSuggestionTypeColor(typ SuggestType) (textColor, bgColor Color) {
 	switch typ {
 	case SuggestTypeLabel:
-		return r.labelTextColor, r.labelBGColor
+		return r.suggestTypeLabelTextColor, r.suggestTypeLabelBGColor
 	case SuggestTypeNote:
-		return r.noteTextColor, r.noteBGColor
+		return r.suggestTypeNoteTextColor, r.suggestTypeNoteBGColor
 	case SuggestTypeWarning:
-		return r.warningTextColor, r.warningBGColor
+		return r.suggestTypeWarningTextColor, r.suggestTypeWarningBGColor
 	case SuggestTypeError:
-		return r.errorTextColor, r.errorBGColor
+		return r.suggestTypeErrorTextColor, r.suggestTypeErrorBGColor
 	default:
 		return r.suggestionTextColor, r.suggestionBGColor
 	}
