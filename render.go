@@ -45,14 +45,18 @@ type Render struct {
 	scrollbarBGColor             Color
 	statusBarTextColor           Color
 	statusBarBGColor             Color
-	suggestTypeLabelTextColor    Color
-	suggestTypeLabelBGColor      Color
-	suggestTypeNoteTextColor     Color
-	suggestTypeNoteBGColor       Color
-	suggestTypeWarningTextColor  Color
-	suggestTypeWarningBGColor    Color
-	suggestTypeErrorTextColor    Color
-	suggestTypeErrorBGColor      Color
+	// TODO: consider reverting this to just "Suggest.Label" as a bool plus
+	// optional color overrides for Suggest.Text, Suggest.SelectedText,
+	// Suggest.Description, and Suggest.SelectedDescription.  Labels should
+	// have only a default FG and BG color since they are not-selectable.
+	suggestTypeLabelTextColor   Color
+	suggestTypeLabelBGColor     Color
+	suggestTypeNoteTextColor    Color
+	suggestTypeNoteBGColor      Color
+	suggestTypeWarningTextColor Color
+	suggestTypeWarningBGColor   Color
+	suggestTypeErrorTextColor   Color
+	suggestTypeErrorBGColor     Color
 }
 
 // Setup to initialize console output.
