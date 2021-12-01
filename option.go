@@ -276,6 +276,14 @@ func OptionBreakLineCallback(fn func(*Document)) Option {
 	}
 }
 
+// OptionCancelLineCallback to run a callback at every line cancellation (ctrl-c)
+func OptionCancelLineCallback(fn func(*Document)) Option {
+	return func(p *Prompt) error {
+		p.cancelLineCallback = fn
+		return nil
+	}
+}
+
 // OptionSetExitCheckerOnInput set an exit function which checks if go-prompt exits its Run loop
 func OptionSetExitCheckerOnInput(fn ExitChecker) Option {
 	return func(p *Prompt) error {

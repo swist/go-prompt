@@ -28,23 +28,24 @@ type Completer func(Document) []Suggest
 
 // Prompt is core struct of go-prompt.
 type Prompt struct {
-	in                ConsoleParser
-	r                 *bufio.Reader
-	buf               *Buffer
-	renderer          *Render
-	executor          Executor
-	history           *History
-	lexer             *Lexer
-	completion        *CompletionManager
-	keyBindings       []KeyBind
-	ASCIICodeBindings []ASCIICodeBind
-	keyBindMode       KeyBindMode
-	completionOnDown  bool
-	exitChecker       ExitChecker
-	skipTearDown      bool
-	lastBytes         []byte
-	refreshTicker     *time.Ticker
-	refreshChecker    RefreshChecker
+	in                 ConsoleParser
+	r                  *bufio.Reader
+	buf                *Buffer
+	renderer           *Render
+	executor           Executor
+	history            *History
+	lexer              *Lexer
+	completion         *CompletionManager
+	keyBindings        []KeyBind
+	ASCIICodeBindings  []ASCIICodeBind
+	keyBindMode        KeyBindMode
+	completionOnDown   bool
+	exitChecker        ExitChecker
+	skipTearDown       bool
+	lastBytes          []byte
+	refreshTicker      *time.Ticker
+	refreshChecker     RefreshChecker
+	cancelLineCallback func(*Document)
 }
 
 // Exec is the struct contains user input context.
@@ -184,6 +185,9 @@ func (p *Prompt) feed(buf []byte) (shouldExit bool, exec *Exec, bufLeft []byte, 
 			}
 		}
 	case ControlC:
+		if p.cancelLineCallback != nil {
+			p.cancelLineCallback(p.buf.Document())
+		}
 		p.renderer.BreakLine(p.buf, p.lexer)
 		p.buf = NewBuffer()
 		p.history.Clear()
