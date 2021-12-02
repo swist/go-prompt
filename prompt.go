@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"os"
 	"regexp"
+	"strconv"
 	"time"
+	"unicode/utf8"
 
 	"github.com/c-bata/go-prompt/internal/debug"
 )
@@ -216,7 +218,11 @@ func (p *Prompt) feed(buf []byte) (shouldExit bool, exec *Exec, bufLeft []byte, 
 		if p.handleASCIICodeBinding(b) {
 			return
 		}
-		p.buf.InsertText(string(b), false, true)
+		// Only insert printable characters
+		r, _ := utf8.DecodeRune(b)
+		if strconv.IsPrint(r) {
+			p.buf.InsertText(string(b), false, true)
+		}
 	}
 
 	shouldExit = p.handleKeyBinding(key)
