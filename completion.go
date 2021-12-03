@@ -25,6 +25,33 @@ var (
 type Suggest struct {
 	Text        string
 	Description string
+	Context     interface{}
+	OnSelected  func(s Suggest) Suggest
+	OnCommitted func(s Suggest) Suggest
+}
+
+func (s *Suggest) selected() Suggest {
+	if s.OnSelected != nil {
+		return s.OnSelected(*s)
+	}
+	return *s
+}
+
+func (s *Suggest) committed() Suggest {
+	if s.OnCommitted != nil {
+		return s.OnCommitted(*s)
+	}
+	return *s
+}
+
+func (s *Suggest) Clone(text string) Suggest {
+	return Suggest{
+		Text:        text,
+		Description: s.Description,
+		Context:     s.Context,
+		OnSelected:  s.OnSelected,
+		OnCommitted: s.OnCommitted,
+	}
 }
 
 // CompletionManager manages which suggestion is now selected.
@@ -51,7 +78,8 @@ func (c *CompletionManager) GetSelectedSuggestion() (s Suggest, ok bool) {
 	} else if len(c.tmp) == 0 {
 		return Suggest{}, false
 	}
-	return c.tmp[c.selected], true
+	s = c.tmp[c.selected].selected()
+	return s, true
 }
 
 // GetSuggestions returns the list of suggestion.

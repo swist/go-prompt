@@ -249,6 +249,7 @@ func (p *Prompt) handleCompletionKeyBinding(key Key, completing bool) {
 			if w != "" {
 				p.buf.DeleteBeforeCursor(len([]rune(w)))
 			}
+			s = s.committed()
 			p.buf.InsertText(s.Text, false, true)
 		}
 		p.completion.Reset()
