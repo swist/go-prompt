@@ -25,9 +25,9 @@ var (
 type Suggest struct {
 	Text        string
 	Description string
-	Context     interface{}
-	OnSelected  func(s Suggest) Suggest
-	OnCommitted func(s Suggest) Suggest
+	Context     interface{}             `json:"-"`
+	OnSelected  func(s Suggest) Suggest `json:"-"`
+	OnCommitted func(s Suggest) Suggest `json:"-"`
 }
 
 func (s *Suggest) selected() Suggest {
