@@ -44,7 +44,7 @@ func (s *Suggest) committed() Suggest {
 	return *s
 }
 
-func (s *Suggest) Clone(text string) Suggest {
+func (s *Suggest) CloneWithText(text string) Suggest {
 	return Suggest{
 		Text:        text,
 		Description: s.Description,
