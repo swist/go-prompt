@@ -47,7 +47,7 @@ func OptionRenderPrefixAtStart(x bool) Option {
 	}
 }
 
-// OptionInitialBufferText to set the initial buffer text
+// OptionInitialBufferText to set the initial buffer text.
 func OptionInitialBufferText(x string) Option {
 	return func(p *Prompt) error {
 		p.buf.InsertText(x, false, true)
@@ -71,7 +71,7 @@ func OptionCompletionExpandDescriptions(x bool) Option {
 	}
 }
 
-// OptionLivePrefix to change the prefix dynamically by callback function
+// OptionLivePrefix to change the prefix dynamically by callback function.
 func OptionLivePrefix(f func(doc *Document, isBreak bool) (prefix string, useLivePrefix bool)) Option {
 	return func(p *Prompt) error {
 		p.renderer.livePrefixCallback = f
@@ -79,7 +79,7 @@ func OptionLivePrefix(f func(doc *Document, isBreak bool) (prefix string, useLiv
 	}
 }
 
-// OptionPrefixTextColor change a text color of prefix string
+// OptionPrefixTextColor change a text color of prefix string.
 func OptionPrefixTextColor(x Color) Option {
 	return func(p *Prompt) error {
 		p.renderer.prefixTextColor = x
@@ -87,7 +87,7 @@ func OptionPrefixTextColor(x Color) Option {
 	}
 }
 
-// OptionPrefixBackgroundColor to change a background color of prefix string
+// OptionPrefixBackgroundColor to change a background color of prefix string.
 func OptionPrefixBackgroundColor(x Color) Option {
 	return func(p *Prompt) error {
 		p.renderer.prefixBGColor = x
@@ -95,7 +95,7 @@ func OptionPrefixBackgroundColor(x Color) Option {
 	}
 }
 
-// OptionInputTextColor to change a color of text which is input by user
+// OptionInputTextColor to change a color of text which is input by user.
 func OptionInputTextColor(x Color) Option {
 	return func(p *Prompt) error {
 		p.renderer.inputTextColor = x
@@ -103,7 +103,7 @@ func OptionInputTextColor(x Color) Option {
 	}
 }
 
-// OptionInputBGColor to change a color of background which is input by user
+// OptionInputBGColor to change a color of background which is input by user.
 func OptionInputBGColor(x Color) Option {
 	return func(p *Prompt) error {
 		p.renderer.inputBGColor = x
@@ -111,7 +111,7 @@ func OptionInputBGColor(x Color) Option {
 	}
 }
 
-// OptionPreviewSuggestionTextColor to change a text color which is completed
+// OptionPreviewSuggestionTextColor to change a text color which is completed.
 func OptionPreviewSuggestionTextColor(x Color) Option {
 	return func(p *Prompt) error {
 		p.renderer.previewSuggestionTextColor = x
@@ -119,7 +119,7 @@ func OptionPreviewSuggestionTextColor(x Color) Option {
 	}
 }
 
-// OptionPreviewSuggestionBGColor to change a background color which is completed
+// OptionPreviewSuggestionBGColor to change a background color which is completed.
 func OptionPreviewSuggestionBGColor(x Color) Option {
 	return func(p *Prompt) error {
 		p.renderer.previewSuggestionBGColor = x
@@ -207,6 +207,30 @@ func OptionScrollbarBGColor(x Color) Option {
 	}
 }
 
+// OptionStatusBarTextColor sets the foreground color of the statusbar.
+func OptionStatusBarTextColor(x Color) Option {
+	return func(p *Prompt) error {
+		p.renderer.statusBarTextColor = x
+		return nil
+	}
+}
+
+// OptionStatusBarTextColor sets the foreground color of the statusbar.
+func OptionStatusBarBGColor(x Color) Option {
+	return func(p *Prompt) error {
+		p.renderer.statusBarBGColor = x
+		return nil
+	}
+}
+
+// OptionStatusBarChannel sets a channel that provides statusbar update data.
+func OptionStatusBarChannel(statusBarCh chan StatusBar) Option {
+	return func(p *Prompt) error {
+		p.statusBarCh = statusBarCh
+		return nil
+	}
+}
+
 // OptionMaxSuggestion specify the max number of displayed suggestions.
 func OptionMaxSuggestion(x uint16) Option {
 	return func(p *Prompt) error {
@@ -268,7 +292,7 @@ func OptionShowCompletionAtStart() Option {
 	}
 }
 
-// OptionBreakLineCallback to run a callback at every break line
+// OptionBreakLineCallback to run a callback at every break line.
 func OptionBreakLineCallback(fn func(*Document)) Option {
 	return func(p *Prompt) error {
 		p.renderer.breakLineCallback = fn
@@ -276,7 +300,7 @@ func OptionBreakLineCallback(fn func(*Document)) Option {
 	}
 }
 
-// OptionCancelLineCallback to run a callback at every line cancellation (ctrl-c)
+// OptionCancelLineCallback to run a callback at every line cancellation (ctrl-c).
 func OptionCancelLineCallback(fn func(*Document)) Option {
 	return func(p *Prompt) error {
 		p.cancelLineCallback = fn
@@ -284,7 +308,7 @@ func OptionCancelLineCallback(fn func(*Document)) Option {
 	}
 }
 
-// OptionSetExitCheckerOnInput set an exit function which checks if go-prompt exits its Run loop
+// OptionSetExitCheckerOnInput set an exit function which checks if go-prompt exits its Run loop.
 func OptionSetExitCheckerOnInput(fn ExitChecker) Option {
 	return func(p *Prompt) error {
 		p.exitChecker = fn
@@ -318,7 +342,7 @@ func OptionRefreshChecker(fn RefreshChecker) Option {
 	}
 }
 
-// OptionTtyFallbackErrors list of error strings to consider when falling back when opening tty fd fails
+// OptionTtyFallbackErrors list of error strings to consider when falling back when opening tty fd fails.
 func OptionTtyFallbackErrors(errors []string) Option {
 	return func(p *Prompt) error {
 		ttyFallbackErrors = errors

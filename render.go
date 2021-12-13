@@ -20,6 +20,7 @@ type Render struct {
 	title               string
 	row                 uint16
 	col                 uint16
+	statusBar           *StatusBar
 	renderPrefixAtStart bool
 
 	previousCursor int
@@ -41,6 +42,8 @@ type Render struct {
 	selectedDescriptionBGColor   Color
 	scrollbarThumbColor          Color
 	scrollbarBGColor             Color
+	statusBarTextColor           Color
+	statusBarBGColor             Color
 }
 
 // Setup to initialize console output.
@@ -233,6 +236,7 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 		return
 	}
 	defer func() { debug.AssertNoError(r.out.Flush()) }()
+	r.prepareArea(2)
 	r.move(r.previousCursor, 0)
 
 	line := buffer.Text()
@@ -286,6 +290,7 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 	cursor = r.backward(cursor, runewidth.StringWidth(line)-buffer.DisplayCursorPosition())
 
 	r.renderCompletion(buffer, completion)
+	r.renderStatusBar()
 	if suggest, ok := completion.GetSelectedSuggestion(); ok {
 		cursor = r.backward(cursor, runewidth.StringWidth(buffer.Document().GetWordBeforeCursorUntilSeparator(completion.wordSeparator)))
 
@@ -323,6 +328,55 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 		cursor = r.backward(cursor, runewidth.StringWidth(rest))
 	}
 	r.previousCursor = cursor
+}
+
+func (r *Render) renderStatusBar() {
+	r.out.SaveCursor()
+	defer func() {
+		r.out.UnSaveCursor()
+		r.out.CursorUp(0)
+	}()
+
+	if r.statusBar != nil && r.statusBar.Text != "" {
+		r.out.CursorDown(int(r.row))
+		r.out.CursorBackward(int(r.col))
+		fs, _ := formatTexts([]string{r.statusBar.Text}, int(r.col-2), "", "")
+		if len(fs) == 0 {
+			return
+		}
+		fs = padTexts(fs, " ", int(r.col))
+		fgColor := r.statusBarTextColor
+		if r.statusBar.TextColor != nil {
+			fgColor = *r.statusBar.TextColor
+		}
+		bgColor := r.statusBarBGColor
+		if r.statusBar.BGColor != nil {
+			bgColor = *r.statusBar.BGColor
+		}
+		r.out.SetColor(fgColor, bgColor, r.statusBar.Bold)
+		r.out.WriteStr(fs[0])
+		r.out.SetColor(DefaultColor, DefaultColor, r.statusBar.Bold)
+	}
+}
+
+func padTexts(orig []string, pad string, length int) []string {
+	pl := len(pad)
+	if pl <= 0 {
+		return orig
+	}
+	if len(orig) == 0 {
+		tot, mod := length/pl, length%pl
+		return []string{strings.Repeat(pad, tot) + pad[0:mod]}
+	}
+	padded := make([]string, 0, len(orig))
+
+	for _, o := range orig {
+		fillLen := length - len(o)
+		tot, mod := fillLen/pl, fillLen%pl
+		p := strings.Repeat(pad, tot) + pad[0:mod]
+		padded = append(padded, o+p)
+	}
+	return padded
 }
 
 // BreakLine to break line.

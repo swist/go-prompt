@@ -28,6 +28,14 @@ type RefreshChecker func(d *Document) bool
 // Completer should return the suggest item from Document.
 type Completer func(Document) []Suggest
 
+// StatusBar contains the status string and optional text and bg colors.
+type StatusBar struct {
+	Text      string
+	TextColor *Color
+	BGColor   *Color
+	Bold      bool
+}
+
 // Prompt is core struct of go-prompt.
 type Prompt struct {
 	in                 ConsoleParser
@@ -44,6 +52,7 @@ type Prompt struct {
 	completionOnDown   bool
 	exitChecker        ExitChecker
 	skipTearDown       bool
+	statusBarCh        chan StatusBar
 	lastBytes          []byte
 	refreshTicker      *time.Ticker
 	refreshChecker     RefreshChecker
@@ -135,6 +144,9 @@ func (p *Prompt) Run() {
 			p.renderer.BreakLine(p.buf, p.lexer)
 			p.tearDown()
 			os.Exit(code)
+		case statusBar := <-p.statusBarCh:
+			p.renderer.statusBar = &statusBar
+			p.Refresh(false)
 		case <-tickCh:
 			if p.refreshChecker == nil {
 				p.Refresh(true)
@@ -371,4 +383,22 @@ func (p *Prompt) tearDown() {
 	if p.refreshTicker != nil {
 		p.refreshTicker.Stop()
 	}
+}
+
+func (s *StatusBar) Equal(o StatusBar) bool {
+	if s == nil {
+		return false
+	}
+	if s.Text != o.Text || s.Bold != o.Bold {
+		return false
+	}
+	sfg, ofg := s.TextColor, o.TextColor
+	if sfg != ofg && (sfg == nil || ofg == nil || *sfg != *ofg) {
+		return false
+	}
+	sbg, obg := s.BGColor, o.BGColor
+	if sbg != obg && (sbg == nil || obg == nil || *sbg != *obg) {
+		return false
+	}
+	return true
 }
