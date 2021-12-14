@@ -121,7 +121,8 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 		formatted = r.expandDescription(formatted, selectedSuggest.Description, selected, int(completions.max), rightWidth, leftWidth)
 		windowHeight = len(formatted)
 	}
-	r.prepareArea(windowHeight)
+
+	r.prepareArea(windowHeight + 1) // +1 means a height of status bar
 
 	cursor := runewidth.StringWidth(prefix) + runewidth.StringWidth(buf.Document().TextBeforeCursor())
 	x, _ := r.toPos(cursor)
@@ -236,7 +237,8 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 		return
 	}
 	defer func() { debug.AssertNoError(r.out.Flush()) }()
-	r.prepareArea(2)
+
+	r.prepareArea(1) // 1 means a height of status bar
 	r.move(r.previousCursor, 0)
 
 	line := buffer.Text()
