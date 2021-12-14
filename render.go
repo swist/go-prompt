@@ -107,8 +107,7 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 	prefix := r.getCurrentPrefix(buf, false)
 	maxWidth := int(r.col) - runewidth.StringWidth(prefix) - 1 // -1 means a width of scrollbar
 	formatted, width, leftWidth, rightWidth := formatSuggestions(suggestions, maxWidth)
-	// +1 means a width of scrollbar.
-	width++
+	width++ // +1 means a width of scrollbar
 
 	windowHeight := len(formatted)
 	if windowHeight > int(completions.max) {
@@ -357,7 +356,7 @@ func (r *Render) renderStatusBar() {
 		}
 		r.out.SetColor(fgColor, bgColor, r.statusBar.Bold)
 		r.out.WriteStr(fs[0])
-		r.out.SetColor(DefaultColor, DefaultColor, r.statusBar.Bold)
+		r.out.SetColor(DefaultColor, DefaultColor, false)
 	}
 }
 
