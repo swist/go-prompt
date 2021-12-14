@@ -158,12 +158,12 @@ func (w *VT100Writer) AskForCPR() {
 
 // SaveCursor saves current cursor position.
 func (w *VT100Writer) SaveCursor() {
-	w.WriteRaw([]byte{0x1b, '[', 's'})
+	w.WriteRaw([]byte{0x1b, '7'})
 }
 
 // UnSaveCursor restores cursor position after a Save Cursor.
 func (w *VT100Writer) UnSaveCursor() {
-	w.WriteRaw([]byte{0x1b, '[', 'u'})
+	w.WriteRaw([]byte{0x1b, '8'})
 }
 
 /* Scrolling */

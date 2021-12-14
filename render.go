@@ -137,11 +137,12 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 	fractionAbove := float64(completions.verticalScroll) / float64(contentHeight)
 
 	scrollbarHeight := int(clamp(float64(windowHeight), 1, float64(windowHeight)*fractionVisible))
+	scrollbarTopFloat := float64(windowHeight) * fractionAbove
 	var scrollbarTop int
 	if showingLast {
-		scrollbarTop = int(math.Ceil(float64(windowHeight) * fractionAbove))
+		scrollbarTop = int(math.Ceil(scrollbarTopFloat))
 	} else {
-		scrollbarTop = int(math.Floor(float64(windowHeight) * fractionAbove))
+		scrollbarTop = int(math.Floor(scrollbarTopFloat))
 	}
 
 	isScrollThumb := func(row int) bool {
