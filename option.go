@@ -207,54 +207,6 @@ func OptionSuggestTypeLabelBGColor(x Color) Option {
 	}
 }
 
-// OptionNoteTextColor to change a text color of description which is selected inside suggestions drop down box.
-func OptionSuggestTypeNoteTextColor(x Color) Option {
-	return func(p *Prompt) error {
-		p.renderer.suggestTypeNoteTextColor = x
-		return nil
-	}
-}
-
-// OptionSuggestTypeNoteBGColor to change a background color of description which is selected inside suggestions drop down box.
-func OptionSuggestTypeNoteBGColor(x Color) Option {
-	return func(p *Prompt) error {
-		p.renderer.suggestTypeNoteBGColor = x
-		return nil
-	}
-}
-
-// OptionSuggestTypeWarningTextColor to change a text color of description which is selected inside suggestions drop down box.
-func OptionSuggestTypeWarningTextColor(x Color) Option {
-	return func(p *Prompt) error {
-		p.renderer.suggestTypeWarningTextColor = x
-		return nil
-	}
-}
-
-// OptionSuggestTypeWarningBGColor to change a background color of description which is selected inside suggestions drop down box.
-func OptionSuggestTypeWarningBGColor(x Color) Option {
-	return func(p *Prompt) error {
-		p.renderer.suggestTypeWarningBGColor = x
-		return nil
-	}
-}
-
-// OptionSuggestTypeErrorTextColor to change a text color of description which is selected inside suggestions drop down box.
-func OptionSuggestTypeErrorTextColor(x Color) Option {
-	return func(p *Prompt) error {
-		p.renderer.suggestTypeErrorTextColor = x
-		return nil
-	}
-}
-
-// OptionSuggestTypeErrorBGColor to change a background color of description which is selected inside suggestions drop down box.
-func OptionSuggestTypeErrorBGColor(x Color) Option {
-	return func(p *Prompt) error {
-		p.renderer.suggestTypeErrorBGColor = x
-		return nil
-	}
-}
-
 // OptionScrollbarThumbColor to change a thumb color on scrollbar.
 func OptionScrollbarThumbColor(x Color) Option {
 	return func(p *Prompt) error {
@@ -442,13 +394,7 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 			scrollbarThumbColor:          DarkGray,
 			scrollbarBGColor:             Cyan,
 			suggestTypeLabelTextColor:    White,
-			suggestTypeLabelBGColor:      Blue,
-			suggestTypeNoteTextColor:     White,
-			suggestTypeNoteBGColor:       DarkGray,
-			suggestTypeWarningTextColor:  Black,
-			suggestTypeWarningBGColor:    Yellow,
-			suggestTypeErrorTextColor:    White,
-			suggestTypeErrorBGColor:      Red,
+			suggestTypeLabelBGColor:      DarkGray,
 		},
 		buf:         NewBuffer(),
 		executor:    executor,

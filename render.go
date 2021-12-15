@@ -45,18 +45,8 @@ type Render struct {
 	scrollbarBGColor             Color
 	statusBarTextColor           Color
 	statusBarBGColor             Color
-	// TODO: consider reverting this to just "Suggest.Label" as a bool plus
-	// optional color overrides for Suggest.Text, Suggest.SelectedText,
-	// Suggest.Description, and Suggest.SelectedDescription.  Labels should
-	// have only a default FG and BG color since they are not-selectable.
-	suggestTypeLabelTextColor   Color
-	suggestTypeLabelBGColor     Color
-	suggestTypeNoteTextColor    Color
-	suggestTypeNoteBGColor      Color
-	suggestTypeWarningTextColor Color
-	suggestTypeWarningBGColor   Color
-	suggestTypeErrorTextColor   Color
-	suggestTypeErrorBGColor     Color
+	suggestTypeLabelTextColor    Color
+	suggestTypeLabelBGColor      Color
 }
 
 // Setup to initialize console output.
@@ -208,12 +198,6 @@ func (r *Render) getSuggestionTypeColor(typ SuggestType) (textColor, bgColor Col
 	switch typ {
 	case SuggestTypeLabel:
 		return r.suggestTypeLabelTextColor, r.suggestTypeLabelBGColor
-	case SuggestTypeNote:
-		return r.suggestTypeNoteTextColor, r.suggestTypeNoteBGColor
-	case SuggestTypeWarning:
-		return r.suggestTypeWarningTextColor, r.suggestTypeWarningBGColor
-	case SuggestTypeError:
-		return r.suggestTypeErrorTextColor, r.suggestTypeErrorBGColor
 	default:
 		return r.suggestionTextColor, r.suggestionBGColor
 	}

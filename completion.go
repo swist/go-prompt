@@ -20,9 +20,6 @@ type SuggestType string
 const (
 	SuggestTypeDefault = ""
 	SuggestTypeLabel   = "label"
-	SuggestTypeNote    = "note"
-	SuggestTypeWarning = "warning"
-	SuggestTypeError   = "error"
 )
 
 var (
