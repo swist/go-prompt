@@ -63,7 +63,7 @@ func filterSuggestions(suggestions []Suggest, sub string, ignoreCase bool, funct
 		if ignoreCase {
 			c = strings.ToUpper(c)
 		}
-		if function(c, sub) {
+		if suggestions[i].Type == SuggestTypeLabel || function(c, sub) {
 			ret = append(ret, suggestions[i])
 		}
 	}
