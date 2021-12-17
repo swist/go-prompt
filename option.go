@@ -79,6 +79,15 @@ func OptionLivePrefix(f func(doc *Document, isBreak bool) (prefix string, useLiv
 	}
 }
 
+// OptionSanitizer sets a callback function to be called before executing the command. It may update the document
+// before execution.
+func OptionSanitizer(f func(d Document) Document) Option {
+	return func(p *Prompt) error {
+		p.sanitizer = f
+		return nil
+	}
+}
+
 // OptionPrefixTextColor change a text color of prefix string.
 func OptionPrefixTextColor(x Color) Option {
 	return func(p *Prompt) error {

@@ -12,6 +12,10 @@ import (
 	"github.com/c-bata/go-prompt/internal/debug"
 )
 
+// Sanitizer is called when user input something text, but before calling breakline/executor.  May be used to
+// modify the input text before committing to history, etc.
+type Sanitizer func(d Document) Document
+
 // Executor is called when user input something text.
 type Executor func(string)
 
@@ -34,6 +38,7 @@ type Prompt struct {
 	r                  *bufio.Reader
 	buf                *Buffer
 	renderer           *Render
+	sanitizer          Sanitizer
 	executor           Executor
 	history            *History
 	lexer              *Lexer
@@ -183,6 +188,10 @@ func (p *Prompt) feed(buf []byte) (shouldExit bool, exec *Exec, bufLeft []byte, 
 		if len(match) == 2 {
 			p.buf.DeleteBeforeCursor(len(match[1]))
 		} else {
+			if p.sanitizer != nil {
+				d := p.sanitizer(*p.buf.Document())
+				p.buf.setDocument(&d)
+			}
 			p.renderer.BreakLine(p.buf, p.lexer)
 			exec = &Exec{input: p.buf.Text()}
 			p.buf = NewBuffer()
