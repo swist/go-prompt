@@ -184,6 +184,7 @@ func (p *Prompt) feed(buf []byte) (shouldExit bool, exec *Exec, bufLeft []byte, 
 
 	switch key {
 	case Enter, ControlJ, ControlM:
+		// TODO: update to match on odd numbers of trailing backslashes: `(?:^|[^\\])\\(\\\\)*$`
 		match := regexp.MustCompile(`(\\+)$`).FindStringSubmatch(p.buf.Text())
 		if len(match) == 2 {
 			p.buf.DeleteBeforeCursor(len(match[1]))

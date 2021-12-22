@@ -414,35 +414,34 @@ func padTexts(orig []string, pad string, length int) []string {
 
 // BreakLine to break line.
 func (r *Render) BreakLine(buffer *Buffer, lexer *Lexer) {
+	d := buffer.Document()
+	line := d.Text + "\n"
+
 	// Erasing and Render
 	prefix := r.getCurrentPrefix(buffer, true)
-	cursor := runewidth.StringWidth(buffer.Document().TextBeforeCursor()) + runewidth.StringWidth(prefix)
+	cursor := runewidth.StringWidth(d.TextBeforeCursor()) + runewidth.StringWidth(prefix)
 	r.clear(cursor)
 
 	r.renderPrefix(buffer, true)
 
 	if lexer.IsEnabled {
-		processed := lexer.Process(buffer.Document().Text + "\n")
-
-		var s = buffer.Document().Text + "\n"
-
+		processed := lexer.Process(line)
 		for _, v := range processed {
-			a := strings.SplitAfter(s, v.Text)
-			s = strings.TrimPrefix(s, a[0])
-
+			a := strings.SplitAfter(line, v.Text)
+			line = strings.TrimPrefix(line, a[0])
 			r.out.SetColor(v.TextColor, v.BGColor, false)
 			r.out.WriteStr(a[0])
 		}
 	} else {
 		r.out.SetColor(r.inputTextColor, r.inputBGColor, false)
-		r.out.WriteStr(buffer.Document().Text + "\n")
+		r.out.WriteStr(line)
 	}
 
 	r.out.SetColor(DefaultColor, DefaultColor, false)
 
 	debug.AssertNoError(r.out.Flush())
 	if r.breakLineCallback != nil {
-		r.breakLineCallback(buffer.Document())
+		r.breakLineCallback(d)
 	}
 
 	r.previousCursor = 0
