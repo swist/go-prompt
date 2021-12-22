@@ -265,12 +265,13 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 	}
 	defer func() { debug.AssertNoError(r.out.Flush()) }()
 
-	r.prepareArea(1) // 1 means a height of status bar
+	line := buffer.Text()
+	lw := runewidth.StringWidth(line)
+	r.prepareArea((lw / int(r.col)) + 1) // 1 means a height of status bar
 	r.move(r.previousCursor, 0)
 
-	line := buffer.Text()
 	prefix := r.getCurrentPrefix(buffer, false)
-	cursor := runewidth.StringWidth(prefix) + runewidth.StringWidth(line)
+	cursor := runewidth.StringWidth(prefix) + lw
 
 	// prepare area
 	_, y := r.toPos(cursor)
