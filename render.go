@@ -369,7 +369,7 @@ func (r *Render) renderStatusBar() {
 	if r.statusBar != nil && r.statusBar.Text != "" {
 		r.out.CursorDown(int(r.row))
 		r.out.CursorBackward(int(r.col))
-		fs, _ := formatTexts([]string{r.statusBar.Text}, int(r.col-2), "", "")
+		fs, _ := formatTexts([]string{r.statusBar.Text}, int(r.col), "", "")
 		if len(fs) == 0 {
 			return
 		}
@@ -401,6 +401,9 @@ func padTexts(orig []string, pad string, length int) []string {
 
 	for _, o := range orig {
 		fillLen := length - len(o)
+		if fillLen < 0 {
+			fillLen = 0
+		}
 		tot, mod := fillLen/pl, fillLen%pl
 		p := strings.Repeat(pad, tot) + pad[0:mod]
 		padded = append(padded, o+p)
