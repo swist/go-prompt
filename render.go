@@ -293,19 +293,7 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 	}
 
 	if lexer.IsEnabled {
-		processed := lexer.Process(line)
-		var s = line
-
-		for _, v := range processed {
-			a := strings.SplitAfter(s, v.Text)
-			if len(a) == 0 {
-				continue
-			}
-			s = strings.TrimPrefix(s, a[0])
-
-			r.out.SetColor(v.TextColor, v.BGColor, false)
-			r.out.WriteStr(a[0])
-		}
+		r.renderLexed(line, lexer)
 	} else {
 		r.out.SetColor(r.inputTextColor, r.inputBGColor, false)
 		r.out.WriteStr(line)
@@ -332,20 +320,7 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 		rest := buffer.Document().TextAfterCursor()
 
 		if lexer.IsEnabled {
-			processed := lexer.Process(rest)
-
-			var s = rest
-
-			for _, v := range processed {
-				a := strings.SplitAfter(s, v.Text)
-				if len(a) == 0 {
-					continue
-				}
-				s = strings.TrimPrefix(s, a[0])
-
-				r.out.SetColor(v.TextColor, v.BGColor, false)
-				r.out.WriteStr(a[0])
-			}
+			r.renderLexed(rest, lexer)
 		} else {
 			r.out.WriteStr(rest)
 		}
@@ -425,13 +400,7 @@ func (r *Render) BreakLine(buffer *Buffer, lexer *Lexer) {
 	r.renderPrefix(buffer, true)
 
 	if lexer.IsEnabled {
-		processed := lexer.Process(line)
-		for _, v := range processed {
-			a := strings.SplitAfter(line, v.Text)
-			line = strings.TrimPrefix(line, a[0])
-			r.out.SetColor(v.TextColor, v.BGColor, false)
-			r.out.WriteStr(a[0])
-		}
+		r.renderLexed(line, lexer)
 	} else {
 		r.out.SetColor(r.inputTextColor, r.inputBGColor, false)
 		r.out.WriteStr(line)
@@ -445,6 +414,25 @@ func (r *Render) BreakLine(buffer *Buffer, lexer *Lexer) {
 	}
 
 	r.previousCursor = 0
+}
+
+func (r *Render) renderLexed(line string, lexer *Lexer) {
+	processed := lexer.Process(line)
+	s := line
+
+	for _, v := range processed {
+		if v.Text == "" {
+			continue
+		}
+		a := strings.SplitAfter(s, v.Text)
+		if len(a) == 0 {
+			continue
+		}
+		s = strings.TrimPrefix(s, a[0])
+
+		r.out.SetColor(v.TextColor, v.BGColor, false)
+		r.out.WriteStr(a[0])
+	}
 }
 
 // clear erases the screen from a beginning of input
