@@ -21,7 +21,7 @@ type Render struct {
 	title               string
 	row                 uint16
 	col                 uint16
-	statusBar           *StatusBar
+	statusBar           StatusBar
 	renderPrefixAtStart bool
 
 	previousCursor int
@@ -342,49 +342,28 @@ func (r *Render) renderStatusBar() {
 		r.out.CursorUp(0)
 	}()
 
-	if r.statusBar != nil && r.statusBar.Text != "" {
+	if r.statusBar != nil {
 		r.out.CursorDown(int(r.row))
 		r.out.CursorBackward(int(r.col))
-		fs, _ := formatTexts([]string{r.statusBar.Text}, int(r.col), "", "")
-		if len(fs) == 0 {
-			return
+		for _, el := range r.statusBar.fit(int(r.col)) {
+			r.renderStatusElement(el)
 		}
-		fs = padTexts(fs, " ", int(r.col))
-		fgColor := r.statusBarTextColor
-		if r.statusBar.TextColor != nil {
-			fgColor = *r.statusBar.TextColor
-		}
-		bgColor := r.statusBarBGColor
-		if r.statusBar.BGColor != nil {
-			bgColor = *r.statusBar.BGColor
-		}
-		r.out.SetColor(fgColor, bgColor, r.statusBar.Bold)
-		r.out.WriteStr(fs[0])
 		r.out.SetColor(DefaultColor, DefaultColor, false)
 	}
 }
 
-func padTexts(orig []string, pad string, length int) []string {
-	pl := len(pad)
-	if pl <= 0 {
-		return orig
+func (r *Render) renderStatusElement(el StatusElement) {
+	fgColor := r.statusBarTextColor
+	if el.TextColor != nil {
+		fgColor = *el.TextColor
 	}
-	if len(orig) == 0 {
-		tot, mod := length/pl, length%pl
-		return []string{strings.Repeat(pad, tot) + pad[0:mod]}
+	bgColor := r.statusBarBGColor
+	if el.BGColor != nil {
+		bgColor = *el.BGColor
 	}
-	padded := make([]string, 0, len(orig))
-
-	for _, o := range orig {
-		fillLen := length - len(o)
-		if fillLen < 0 {
-			fillLen = 0
-		}
-		tot, mod := fillLen/pl, fillLen%pl
-		p := strings.Repeat(pad, tot) + pad[0:mod]
-		padded = append(padded, o+p)
-	}
-	return padded
+	r.out.SetColor(fgColor, bgColor, el.Bold)
+	r.out.EraseEndOfLine()
+	r.out.WriteStr(el.Text)
 }
 
 // BreakLine to break line.

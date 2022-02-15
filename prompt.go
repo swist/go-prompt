@@ -142,7 +142,7 @@ func (p *Prompt) Run() {
 			p.tearDown()
 			os.Exit(code)
 		case statusBar := <-p.statusBarCh:
-			p.renderer.statusBar = &statusBar
+			p.renderer.statusBar = statusBar
 			p.Refresh(false)
 		case <-tickCh:
 			if p.refreshChecker == nil {
