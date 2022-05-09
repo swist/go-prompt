@@ -375,6 +375,13 @@ func OptionTtyFallbackErrors(errors []string) Option {
 	}
 }
 
+func OptionCaptureRenderTimings(enable bool) Option {
+	return func(p *Prompt) error {
+		p.captureRenderTimings = enable
+		return nil
+	}
+}
+
 // New returns a Prompt with powerful auto-completion.
 func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 	defaultWriter := NewStdoutWriter()
@@ -405,12 +412,13 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 			suggestTypeLabelTextColor:    White,
 			suggestTypeLabelBGColor:      DarkGray,
 		},
-		buf:         NewBuffer(),
-		executor:    executor,
-		history:     NewHistory(),
-		lexer:       NewLexer(),
-		completion:  NewCompletionManager(completer, 6),
-		keyBindMode: EmacsKeyBind, // All the above assume that bash is running in the default Emacs setting
+		buf:           NewBuffer(),
+		executor:      executor,
+		history:       NewHistory(),
+		lexer:         NewLexer(),
+		completion:    NewCompletionManager(completer, 6),
+		keyBindMode:   EmacsKeyBind, // All the above assume that bash is running in the default Emacs setting
+		renderTimings: []float64{},
 	}
 
 	for _, opt := range opts {
