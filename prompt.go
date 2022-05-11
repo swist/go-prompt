@@ -34,28 +34,28 @@ type Completer func(Document) []Suggest
 
 // Prompt is core struct of go-prompt.
 type Prompt struct {
-	in                   ConsoleParser
-	r                    *bufio.Reader
-	buf                  *Buffer
-	renderer             *Render
-	sanitizer            Sanitizer
-	executor             Executor
-	history              *History
-	lexer                *Lexer
-	completion           *CompletionManager
-	keyBindings          []KeyBind
-	ASCIICodeBindings    []ASCIICodeBind
-	keyBindMode          KeyBindMode
-	completionOnDown     bool
-	exitChecker          ExitChecker
-	skipTearDown         bool
-	statusBarCh          chan StatusBar
-	lastBytes            []byte
-	refreshTicker        *time.Ticker
-	refreshChecker       RefreshChecker
-	cancelLineCallback   func(*Document)
-	captureRenderTimings bool
-	renderTimings        []float64
+	in                    ConsoleParser
+	r                     *bufio.Reader
+	buf                   *Buffer
+	renderer              *Render
+	sanitizer             Sanitizer
+	executor              Executor
+	history               *History
+	lexer                 *Lexer
+	completion            *CompletionManager
+	keyBindings           []KeyBind
+	ASCIICodeBindings     []ASCIICodeBind
+	keyBindMode           KeyBindMode
+	completionOnDown      bool
+	exitChecker           ExitChecker
+	skipTearDown          bool
+	statusBarCh           chan StatusBar
+	lastBytes             []byte
+	refreshTicker         *time.Ticker
+	refreshChecker        RefreshChecker
+	cancelLineCallback    func(*Document)
+	captureRefreshTimings bool
+	refreshTimings        []float64
 }
 
 // Exec is the struct contains user input context.
@@ -68,19 +68,19 @@ func (p *Prompt) Buffer(line string) {
 }
 
 func (p *Prompt) Refresh(update bool) {
+	if p.captureRefreshTimings {
+		start := time.Now()
+		defer func() { p.refreshTimings = append(p.refreshTimings, float64(time.Since(start).Nanoseconds())) }()
+	}
 	if update {
 		p.completion.Update(*p.buf.Document())
-	}
-	if p.captureRenderTimings {
-		start := time.Now()
-		defer func() { p.renderTimings = append(p.renderTimings, float64(time.Since(start).Nanoseconds())) }()
 	}
 	p.renderer.Render(p.buf, p.completion, p.lexer)
 }
 
-// RenderTimings returns the timings of each rendering.
-func (p *Prompt) RenderTimings() []float64 {
-	return p.renderTimings
+// RefreshTimings returns the timings of each refresh.
+func (p *Prompt) RefreshTimings() []float64 {
+	return p.refreshTimings
 }
 
 // Run starts prompt.

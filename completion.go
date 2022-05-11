@@ -1,8 +1,6 @@
 package prompt
 
 import (
-	"strings"
-
 	"github.com/c-bata/go-prompt/internal/debug"
 	runewidth "github.com/mattn/go-runewidth"
 )
@@ -146,79 +144,6 @@ func (c *CompletionManager) update(skip func()) {
 	if c.selected > -1 && c.tmp[c.selected].Type != SuggestTypeDefault {
 		skip()
 	}
-}
-
-func deleteBreakLineCharacters(s string) string {
-	s = strings.Replace(s, "\n", "", -1)
-	s = strings.Replace(s, "\r", "", -1)
-	return s
-}
-
-func formatTexts(o []string, max int, prefix, suffix string) (new []string, width int) {
-	l := len(o)
-	n := make([]string, l)
-
-	lenPrefix := runewidth.StringWidth(prefix)
-	lenSuffix := runewidth.StringWidth(suffix)
-	lenShorten := runewidth.StringWidth(shortenSuffix)
-	min := lenPrefix + lenSuffix + lenShorten
-	for i := 0; i < l; i++ {
-		o[i] = deleteBreakLineCharacters(o[i])
-
-		w := runewidth.StringWidth(o[i])
-		if width < w {
-			width = w
-		}
-	}
-
-	if width == 0 {
-		return n, 0
-	}
-	if min >= max {
-		return n, 0
-	}
-	if lenPrefix+width+lenSuffix > max {
-		width = max - lenPrefix - lenSuffix
-	}
-
-	for i := 0; i < l; i++ {
-		x := runewidth.StringWidth(o[i])
-		if x <= width {
-			spaces := strings.Repeat(" ", width-x)
-			n[i] = prefix + o[i] + spaces + suffix
-		} else if x > width {
-			x := runewidth.Truncate(o[i], width, shortenSuffix)
-			// When calling runewidth.Truncate("您好xxx您好xxx", 11, "...") returns "您好xxx..."
-			// But the length of this result is 10. So we need fill right using runewidth.FillRight.
-			n[i] = prefix + runewidth.FillRight(x, width) + suffix
-		}
-	}
-	return n, lenPrefix + width + lenSuffix
-}
-
-func formatSuggestions(suggests []Suggest, max int) ([]Suggest, int, int, int) {
-	num := len(suggests)
-	new := make([]Suggest, num)
-
-	left := make([]string, num)
-	for i := 0; i < num; i++ {
-		left[i] = suggests[i].Text
-	}
-	right := make([]string, num)
-	for i := 0; i < num; i++ {
-		right[i] = suggests[i].Description
-	}
-
-	left, leftWidth := formatTexts(left, max, leftPrefix, leftSuffix)
-	if leftWidth == 0 {
-		return []Suggest{}, 0, 0, 0
-	}
-	right, rightWidth := formatTexts(right, max-leftWidth, rightPrefix, rightSuffix)
-
-	for i := 0; i < num; i++ {
-		new[i] = Suggest{Text: left[i], Description: right[i], Type: suggests[i].Type}
-	}
-	return new, leftWidth + rightWidth, leftWidth, rightWidth
 }
 
 // NewCompletionManager returns initialized CompletionManager object.

@@ -12,6 +12,11 @@ import (
 	runewidth "github.com/mattn/go-runewidth"
 )
 
+const (
+	scrollBarWidth  = 1
+	statusBarHeight = 1
+)
+
 // Render to render prompt information from state of Buffer.
 type Render struct {
 	out                 ConsoleWriter
@@ -21,6 +26,7 @@ type Render struct {
 	title               string
 	row                 uint16
 	col                 uint16
+	stringCaches        bool
 	statusBar           StatusBar
 	renderPrefixAtStart bool
 
@@ -108,24 +114,24 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 		return
 	}
 	prefix := r.getCurrentPrefix(buf, false)
-	maxWidth := int(r.col) - runewidth.StringWidth(prefix) - 1 // -1 means a width of scrollbar
-	formatted, width, leftWidth, rightWidth := formatSuggestions(suggestions, maxWidth)
-	width++ // +1 means a width of scrollbar
-
-	windowHeight := len(formatted)
-	if windowHeight > int(completions.max) {
-		windowHeight = int(completions.max)
+	maxWidth := int(r.col) - runewidth.StringWidth(prefix) - scrollBarWidth
+	// TODO: should completion height be returned by formatSuggestions?
+	completionHeight := len(suggestions)
+	if completionHeight > int(completions.max) {
+		completionHeight = int(completions.max)
 	}
-	showingLast := completions.verticalScroll+windowHeight == len(formatted)
-	formatted = formatted[completions.verticalScroll : completions.verticalScroll+windowHeight]
+	formatted, width, leftWidth, rightWidth := formatSuggestions(suggestions, maxWidth, completions.verticalScroll, completionHeight, r.stringCaches)
+	width += scrollBarWidth
+
+	showingLast := completions.verticalScroll+completionHeight == len(suggestions)
 	selected := completions.selected - completions.verticalScroll
 	if selected >= 0 && completions.expandDescriptions {
 		selectedSuggest := suggestions[completions.selected]
-		formatted = r.expandDescription(formatted, selectedSuggest.Description, selected, int(completions.max), rightWidth, leftWidth)
-		windowHeight = len(formatted)
+		formatted = r.expandDescription(formatted, selectedSuggest.Description, int(completions.max), rightWidth, leftWidth)
+		completionHeight = len(formatted)
 	}
 
-	r.prepareArea(windowHeight + 1) // +1 means a height of status bar
+	r.prepareArea(completionHeight + statusBarHeight)
 
 	cursor := runewidth.StringWidth(prefix) + runewidth.StringWidth(buf.Document().TextBeforeCursor())
 	x, _ := r.toPos(cursor)
@@ -135,11 +141,11 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 
 	contentHeight := len(completions.tmp)
 
-	fractionVisible := float64(windowHeight) / float64(contentHeight)
+	fractionVisible := float64(completionHeight) / float64(contentHeight)
 	fractionAbove := float64(completions.verticalScroll) / float64(contentHeight)
 
-	scrollbarHeight := int(clamp(float64(windowHeight), 1, float64(windowHeight)*fractionVisible))
-	scrollbarTopFloat := float64(windowHeight) * fractionAbove
+	scrollbarHeight := int(clamp(float64(completionHeight), 1, float64(completionHeight)*fractionVisible))
+	scrollbarTopFloat := float64(completionHeight) * fractionAbove
 	var scrollbarTop int
 	if showingLast {
 		scrollbarTop = int(math.Ceil(scrollbarTopFloat))
@@ -152,7 +158,7 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 	}
 
 	r.out.SetColor(White, Cyan, false)
-	for i := 0; i < windowHeight; i++ {
+	for i := 0; i < completionHeight; i++ {
 		r.out.CursorDown(1)
 		if i == selected {
 			r.out.SetColor(r.selectedSuggestionTextColor, r.selectedSuggestionBGColor, true)
@@ -190,7 +196,7 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 		r.out.CursorForward(x + width - int(r.col))
 	}
 
-	r.out.CursorUp(windowHeight)
+	r.out.CursorUp(completionHeight)
 	r.out.SetColor(DefaultColor, DefaultColor, false)
 }
 
@@ -203,7 +209,7 @@ func (r *Render) getSuggestionTypeColor(typ SuggestType) (textColor, bgColor Col
 	}
 }
 
-func (r *Render) expandDescription(formatted []Suggest, expand string, selected int, mh int, mw int, leftWidth int) []Suggest {
+func (r *Render) expandDescription(formatted []Suggest, expand string, mh int, mw int, leftWidth int) []Suggest {
 	if mh <= 0 || mw <= 2 {
 		return formatted
 	}
@@ -256,60 +262,9 @@ func (r *Render) expandDescription(formatted []Suggest, expand string, selected 
 	return reformatted
 }
 
-// Render renders to the console.
-func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Lexer) {
-	// In situations where a pseudo tty is allocated (e.g. within a docker container),
-	// window size via TIOCGWINSZ is not immediately available and will result in 0,0 dimensions.
-	if r.col == 0 {
-		return
-	}
-	defer func() { debug.AssertNoError(r.out.Flush()) }()
-
-	line := buffer.Text()
-	lw := runewidth.StringWidth(line)
-	r.prepareArea((lw / int(r.col)) + 1) // 1 means a height of status bar
-	r.move(r.previousCursor, 0)
-
-	prefix := r.getCurrentPrefix(buffer, false)
-	cursor := runewidth.StringWidth(prefix) + lw
-
-	// prepare area
-	_, y := r.toPos(cursor)
-
-	h := y + 1 + int(completion.max)
-	if h > int(r.row) || completionMargin > int(r.col) {
-		r.renderWindowTooSmall()
-		return
-	}
-
-	// Rendering
-	r.out.HideCursor()
-	defer r.out.ShowCursor()
-
-	if r.renderPrefixAtStart {
-		r.renderPrefix(buffer, false)
-	} else {
-		r.renderPrefixAtStart = true
-	}
-
-	if lexer.IsEnabled {
-		r.renderLexed(line, lexer)
-	} else {
-		r.out.SetColor(r.inputTextColor, r.inputBGColor, false)
-		r.out.WriteStr(line)
-	}
-
-	r.out.SetColor(DefaultColor, DefaultColor, false)
-
-	r.lineWrap(cursor)
-
-	r.out.EraseDown()
-
-	cursor = r.backward(cursor, runewidth.StringWidth(line)-buffer.DisplayCursorPosition())
-
-	r.renderCompletion(buffer, completion)
-	r.renderStatusBar()
+func (r *Render) renderSelection(buffer *Buffer, completion *CompletionManager, lexer *Lexer, cursor int) int {
 	if suggest, ok := completion.GetSelectedSuggestion(); ok {
+		// r.out.EraseEndOfLine()
 		cursor = r.backward(cursor, runewidth.StringWidth(buffer.Document().GetWordBeforeCursorUntilSeparator(completion.wordSeparator)))
 
 		r.out.SetColor(r.previewSuggestionTextColor, r.previewSuggestionBGColor, false)
@@ -332,14 +287,84 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 
 		cursor = r.backward(cursor, runewidth.StringWidth(rest))
 	}
-	r.previousCursor = cursor
+	return cursor
+}
+
+// Render renders to the console.
+func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Lexer) {
+	// In situations where a pseudo tty is allocated (e.g. within a docker container),
+	// window size via TIOCGWINSZ is not immediately available and will result in 0,0 dimensions.
+	if r.col == 0 {
+		return
+	}
+
+	defer func() { debug.AssertNoError(r.out.Flush()) }()
+
+	line := buffer.Text()
+	lw := runewidth.StringWidth(line)
+	r.prepareArea((lw / int(r.col)) + statusBarHeight)
+	r.move(r.previousCursor, 0)
+
+	prefix := r.getCurrentPrefix(buffer, false)
+	pw := runewidth.StringWidth(prefix)
+	cursor := lw
+	if r.renderPrefixAtStart {
+		cursor += pw
+	}
+
+	// Ensure area size is large enough to work with
+	_, y := r.toPos(cursor)
+	h := y + 1 + int(completion.max)
+	if h > int(r.row) || completionMargin > int(r.col) {
+		r.renderWindowTooSmall()
+		return
+	}
+
+	// Rendering
+	r.out.HideCursor()
+	defer r.out.ShowCursor()
+
+	// Whether or not to emit the prefix -- typically disabled when the prompt is restarted
+	// in the middle of an existing session
+	if r.renderPrefixAtStart {
+		r.renderPrefix(buffer, false)
+	} else {
+		r.renderPrefixAtStart = true
+	}
+
+	// Render lexed input line if lexing is enabled
+	if lexer.IsEnabled {
+		r.renderLexed(line, lexer)
+	} else {
+		r.out.SetColor(r.inputTextColor, r.inputBGColor, false)
+		r.out.WriteStr(line)
+	}
+
+	// Prepare for render
+	r.out.SetColor(DefaultColor, DefaultColor, false)
+	r.lineWrap(cursor)
+
+	r.out.EraseDown()
+
+	cursor = r.backward(cursor, runewidth.StringWidth(line)-buffer.DisplayCursorPosition())
+
+	// Render components
+	r.renderCompletion(buffer, completion)
+	r.renderStatusBar()
+	r.previousCursor = r.renderSelection(buffer, completion, lexer, cursor)
 }
 
 func (r *Render) renderStatusBar() {
+	if r.statusBar == nil {
+		return
+	}
+
 	r.out.SaveCursor()
+	r.out.HideCursor()
 	defer func() {
 		r.out.UnSaveCursor()
 		r.out.CursorUp(0)
+		r.out.ShowCursor()
 	}()
 
 	if r.statusBar != nil {
@@ -350,6 +375,7 @@ func (r *Render) renderStatusBar() {
 		}
 		r.out.SetColor(DefaultColor, DefaultColor, false)
 	}
+	r.out.SetColor(DefaultColor, DefaultColor, false)
 }
 
 func (r *Render) renderStatusElement(el StatusElement) {

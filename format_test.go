@@ -107,7 +107,7 @@ func TestFormatShortSuggestion(t *testing.T) {
 	}
 
 	for i, s := range scenarioTable {
-		actual, width, _, _ := formatSuggestions(s.in, s.max)
+		actual, width, _, _ := formatSuggestions(s.in, s.max, 0, 100, false)
 		if width != s.exWidth {
 			t.Errorf("[scenario %d] Want %d but got %d\n", i, s.exWidth, width)
 		}
@@ -194,13 +194,22 @@ func TestFormatText(t *testing.T) {
 		},
 	}
 
+	pre := " "
+	suf := " "
 	for i, s := range scenarioTable {
-		actual, width := formatTexts(s.in, s.max, " ", " ")
+		d := textsDimensions(s.in, s.max, pre, suf, false)
+		actual, width := formatTexts(s.in, s.max, pre, suf, d, 0, 100, false)
 		if width != s.exWidth {
 			t.Errorf("[scenario %d] Want %d but got %d\n", i, s.exWidth, width)
 		}
 		if !reflect.DeepEqual(actual, s.expected) {
 			t.Errorf("[scenario %d] Want %#v, but got %#v\n", i, s.expected, actual)
 		}
+	}
+}
+
+func Benchmark_deleteBreakLineCharacters(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		deleteBreakLineCharacters("apple\nbanana\rcoconut")
 	}
 }

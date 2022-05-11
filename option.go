@@ -375,9 +375,16 @@ func OptionTtyFallbackErrors(errors []string) Option {
 	}
 }
 
-func OptionCaptureRenderTimings(enable bool) Option {
+func OptionCaptureRefreshTimings(enable bool) Option {
 	return func(p *Prompt) error {
-		p.captureRenderTimings = enable
+		p.captureRefreshTimings = enable
+		return nil
+	}
+}
+
+func OptionEnableRenderCaches(enable bool) Option {
+	return func(p *Prompt) error {
+		p.renderer.stringCaches = enable
 		return nil
 	}
 }
@@ -412,13 +419,13 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 			suggestTypeLabelTextColor:    White,
 			suggestTypeLabelBGColor:      DarkGray,
 		},
-		buf:           NewBuffer(),
-		executor:      executor,
-		history:       NewHistory(),
-		lexer:         NewLexer(),
-		completion:    NewCompletionManager(completer, 6),
-		keyBindMode:   EmacsKeyBind, // All the above assume that bash is running in the default Emacs setting
-		renderTimings: []float64{},
+		buf:            NewBuffer(),
+		executor:       executor,
+		history:        NewHistory(),
+		lexer:          NewLexer(),
+		completion:     NewCompletionManager(completer, 6),
+		keyBindMode:    EmacsKeyBind, // All the above assume that bash is running in the default Emacs setting
+		refreshTimings: []float64{},
 	}
 
 	for _, opt := range opts {
