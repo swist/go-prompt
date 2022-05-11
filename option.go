@@ -1,6 +1,8 @@
 package prompt
 
-import "time"
+import (
+	"time"
+)
 
 // Option is the type to replace default parameters.
 // prompt.New accepts any number of options (this is functional option pattern).
@@ -35,14 +37,6 @@ func OptionTitle(x string) Option {
 func OptionPrefix(x string) Option {
 	return func(p *Prompt) error {
 		p.renderer.prefix = x
-		return nil
-	}
-}
-
-// OptionRenderPrefix to set whether prefix renders immediately.
-func OptionRenderPrefixAtStart(x bool) Option {
-	return func(p *Prompt) error {
-		p.renderer.renderPrefixAtStart = x
 		return nil
 	}
 }
@@ -399,7 +393,6 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 			prefix:                       "> ",
 			out:                          defaultWriter,
 			livePrefixCallback:           func(*Document, bool) (string, bool) { return "", false },
-			renderPrefixAtStart:          true,
 			prefixTextColor:              Blue,
 			prefixBGColor:                DefaultColor,
 			inputTextColor:               DefaultColor,

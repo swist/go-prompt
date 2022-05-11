@@ -19,16 +19,15 @@ const (
 
 // Render to render prompt information from state of Buffer.
 type Render struct {
-	out                 ConsoleWriter
-	prefix              string
-	livePrefixCallback  func(doc *Document, breakline bool) (prefix string, useLivePrefix bool)
-	breakLineCallback   func(doc *Document)
-	title               string
-	row                 uint16
-	col                 uint16
-	stringCaches        bool
-	statusBar           StatusBar
-	renderPrefixAtStart bool
+	out                ConsoleWriter
+	prefix             string
+	livePrefixCallback func(doc *Document, breakline bool) (prefix string, useLivePrefix bool)
+	breakLineCallback  func(doc *Document)
+	title              string
+	row                uint16
+	col                uint16
+	stringCaches       bool
+	statusBar          StatusBar
 
 	previousCursor int
 
@@ -307,10 +306,7 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 
 	prefix := r.getCurrentPrefix(buffer, false)
 	pw := runewidth.StringWidth(prefix)
-	cursor := lw
-	if r.renderPrefixAtStart {
-		cursor += pw
-	}
+	cursor := pw + lw
 
 	// Ensure area size is large enough to work with
 	_, y := r.toPos(cursor)
@@ -324,13 +320,9 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 	r.out.HideCursor()
 	defer r.out.ShowCursor()
 
-	// Whether or not to emit the prefix -- typically disabled when the prompt is restarted
-	// in the middle of an existing session
-	if r.renderPrefixAtStart {
-		r.renderPrefix(buffer, false)
-	} else {
-		r.renderPrefixAtStart = true
-	}
+	r.out.EraseLine()
+	r.move(cursor, 0)
+	r.renderPrefix(buffer, false)
 
 	// Render lexed input line if lexing is enabled
 	if lexer.IsEnabled {
