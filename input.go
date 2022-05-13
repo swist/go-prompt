@@ -21,6 +21,8 @@ type ConsoleParser interface {
 	GetWinSize() *WinSize
 	// Read returns byte array.
 	Read() ([]byte, error)
+	// Destroy should be called to close the input.
+	Destroy() error
 }
 
 type ConsoleParserReader struct {

@@ -26,6 +26,11 @@ type Executor func(string)
 // Exit means exit go-prompt (not the overall Go program)
 type ExitChecker func(in string, breakline bool) bool
 
+type Refresh struct {
+	Options   RefreshOptions
+	StatusBar StatusBar
+}
+
 // RefreshChecker is called to determine whether or not to refresh the prompt.
 type RefreshChecker func(d *Document) bool
 
@@ -49,12 +54,10 @@ type Prompt struct {
 	completionOnDown      bool
 	exitChecker           ExitChecker
 	skipTearDown          bool
-	statusBarCh           chan StatusBar
 	lastBytes             []byte
-	refreshTicker         *time.Ticker
-	refreshChecker        RefreshChecker
 	cancelLineCallback    func(*Document)
 	captureRefreshTimings bool
+	refreshCh             chan Refresh
 	refreshTimings        []float64
 }
 
@@ -63,19 +66,48 @@ type Exec struct {
 	input string
 }
 
+func (p *Prompt) MustDestroy() {
+	if err := p.in.Destroy(); err != nil {
+		panic(err)
+	}
+}
+
+func (p *Prompt) Destroy() error {
+	return p.in.Destroy()
+}
+
 func (p *Prompt) Buffer(line string) {
 	p.buf = NewBufferWithLine(line)
 }
 
-func (p *Prompt) Refresh(update bool) {
+type RefreshOptions uint8
+
+const (
+	RefreshUpdate RefreshOptions = 1 << iota
+	RefreshRender
+	RefreshStatusBar
+	RefreshAll  RefreshOptions = 0xFF
+	RefreshNone RefreshOptions = 0x00
+)
+
+func (p *Prompt) refresh(options RefreshOptions) {
 	if p.captureRefreshTimings {
 		start := time.Now()
 		defer func() { p.refreshTimings = append(p.refreshTimings, float64(time.Since(start).Nanoseconds())) }()
 	}
-	if update {
+	if options&RefreshUpdate == RefreshUpdate {
 		p.completion.Update(*p.buf.Document())
+		p.renderer.Render(p.buf, p.completion, p.lexer)
+	} else if options&RefreshRender == RefreshRender {
+		p.renderer.Render(p.buf, p.completion, p.lexer)
 	}
-	p.renderer.Render(p.buf, p.completion, p.lexer)
+	if options&RefreshStatusBar == RefreshStatusBar {
+		p.renderer.RenderStatusBar()
+	}
+}
+
+func (p *Prompt) RefreshCh() chan<- Refresh {
+	return p.refreshCh
 }
 
 // RefreshTimings returns the timings of each refresh.
@@ -86,12 +118,17 @@ func (p *Prompt) RefreshTimings() []float64 {
 // Run starts prompt.
 func (p *Prompt) Run() {
 	p.skipTearDown = false
+	debug.Setup()
 	defer debug.Teardown()
 	debug.Log("Run start prompt")
 	p.setUp()
 	defer p.tearDown()
 
-	p.Refresh(p.completion.showAtStart)
+	opts := RefreshRender | RefreshStatusBar
+	if p.completion.showAtStart {
+		opts |= RefreshUpdate
+	}
+	p.refresh(opts)
 
 	bufCh := make(chan []byte)
 	go p.readLine(bufCh)
@@ -100,13 +137,6 @@ func (p *Prompt) Run() {
 	winSizeCh := make(chan *WinSize)
 	stopHandleSignalCh := make(chan struct{})
 	go p.handleSignals(exitCh, winSizeCh, stopHandleSignalCh)
-
-	var tickCh <-chan time.Time
-	if p.refreshTicker != nil {
-		tickCh = p.refreshTicker.C
-	}
-
-	nextRefresh := false
 
 	for {
 		select {
@@ -125,7 +155,6 @@ func (p *Prompt) Run() {
 					debug.AssertNoError(p.in.TearDown())
 
 					p.executor(e.input)
-					p.Refresh(true)
 
 					if p.exitChecker != nil && p.exitChecker(e.input, true) {
 						p.skipTearDown = true
@@ -135,7 +164,7 @@ func (p *Prompt) Run() {
 					debug.AssertNoError(p.in.Setup())
 					go p.handleSignals(exitCh, winSizeCh, stopHandleSignalCh)
 				} else {
-					p.Refresh(true)
+					p.refresh(RefreshAll)
 				}
 				if ended {
 					go p.readLine(bufCh)
@@ -147,25 +176,16 @@ func (p *Prompt) Run() {
 			}
 		case w := <-winSizeCh:
 			p.renderer.UpdateWinSize(w)
-			p.Refresh(false)
+			p.refresh(RefreshRender | RefreshStatusBar)
 		case code := <-exitCh:
 			p.renderer.BreakLine(p.buf, p.lexer)
 			p.tearDown()
 			os.Exit(code)
-		case statusBar := <-p.statusBarCh:
-			p.renderer.statusBar = statusBar
-			p.Refresh(false)
-		case <-tickCh:
-			if p.refreshChecker == nil {
-				p.Refresh(true)
-			} else {
-				// Refreshes one additional time after p.refreshChecker returns false following a true check.
-				prevRefresh := nextRefresh
-				nextRefresh = p.refreshChecker(p.buf.Document())
-				if nextRefresh || prevRefresh {
-					p.Refresh(true)
-				}
+		case refresh := <-p.refreshCh:
+			if refresh.Options&RefreshStatusBar == RefreshStatusBar {
+				p.renderer.statusBar = refresh.StatusBar
 			}
+			p.refresh(refresh.Options)
 		}
 	}
 }
@@ -325,29 +345,33 @@ func (p *Prompt) handleASCIICodeBinding(b []byte) bool {
 
 // Input just returns user input text.
 func (p *Prompt) Input() string {
+	debug.Setup()
 	defer debug.Teardown()
 	debug.Log("Input start prompt")
 	p.setUp()
 	defer p.tearDown()
 
-	p.Refresh(p.completion.showAtStart)
+	opts := RefreshRender | RefreshStatusBar
+	if p.completion.showAtStart {
+		opts |= RefreshUpdate
+	}
+	p.refresh(opts)
 
 	bufCh := make(chan []byte)
 	go p.readLine(bufCh)
 
-	for {
-		select {
-		case b := <-bufCh:
-			if shouldExit, e, _, _ := p.feed(b); shouldExit {
-				p.renderer.BreakLine(p.buf, p.lexer)
-				return ""
-			} else if e != nil {
-				return e.input
-			} else {
-				p.Refresh(true)
-			}
+	result := ""
+	for b := range bufCh {
+		if shouldExit, e, _, _ := p.feed(b); shouldExit {
+			p.renderer.BreakLine(p.buf, p.lexer)
+			break
+		} else if e != nil {
+			result = e.input
+		} else {
+			p.refresh(RefreshAll)
 		}
 	}
+	return result
 }
 
 func (p *Prompt) readChunk() ([]byte, error) {
@@ -393,7 +417,4 @@ func (p *Prompt) tearDown() {
 		debug.AssertNoError(p.in.TearDown())
 	}
 	p.renderer.TearDown()
-	if p.refreshTicker != nil {
-		p.refreshTicker.Stop()
-	}
 }

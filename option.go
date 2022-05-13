@@ -1,9 +1,5 @@
 package prompt
 
-import (
-	"time"
-)
-
 // Option is the type to replace default parameters.
 // prompt.New accepts any number of options (this is functional option pattern).
 type Option func(prompt *Prompt) error
@@ -242,14 +238,6 @@ func OptionStatusBarBGColor(x Color) Option {
 	}
 }
 
-// OptionStatusBarChannel sets a channel that provides statusbar update data.
-func OptionStatusBarChannel(statusBarCh chan StatusBar) Option {
-	return func(p *Prompt) error {
-		p.statusBarCh = statusBarCh
-		return nil
-	}
-}
-
 // OptionMaxSuggestion specify the max number of displayed suggestions.
 func OptionMaxSuggestion(x uint16) Option {
 	return func(p *Prompt) error {
@@ -343,24 +331,6 @@ func OptionSetLexer(fn LexerFunc) Option {
 	}
 }
 
-// OptionRefreshTickerInterval enables a refresh ticker with the given interval.
-func OptionRefreshInterval(interval time.Duration) Option {
-	return func(p *Prompt) error {
-		if interval > 0 {
-			p.refreshTicker = time.NewTicker(interval)
-		}
-		return nil
-	}
-}
-
-// OptionRefreshTickerInterval enables a refresh ticker with the given interval.
-func OptionRefreshChecker(fn RefreshChecker) Option {
-	return func(p *Prompt) error {
-		p.refreshChecker = fn
-		return nil
-	}
-}
-
 // OptionTtyFallbackErrors list of error strings to consider when falling back when opening tty fd fails.
 func OptionTtyFallbackErrors(errors []string) Option {
 	return func(p *Prompt) error {
@@ -418,6 +388,7 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 		lexer:          NewLexer(),
 		completion:     NewCompletionManager(completer, 6),
 		keyBindMode:    EmacsKeyBind, // All the above assume that bash is running in the default Emacs setting
+		refreshCh:      make(chan Refresh, 1000),
 		refreshTimings: []float64{},
 	}
 

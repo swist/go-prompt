@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 package prompt
@@ -41,6 +42,10 @@ func (t *PosixParser) TearDown() error {
 		return err
 	}
 	return nil
+}
+
+func (t *PosixParser) Destroy() error {
+	return syscall.Close(t.fd)
 }
 
 // Read returns byte array.
