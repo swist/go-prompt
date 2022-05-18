@@ -82,7 +82,7 @@ func (el StatusElement) shrinkText(t string, tl, l int) string {
 	tl = runewidth.StringWidth(t)
 	if tl < sl {
 		t = s[:tl]
-	} else if tl > l {
+	} else if tl > l && l >= 0 {
 		t = t[:l]
 		tl = l
 	}

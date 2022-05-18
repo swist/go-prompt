@@ -95,6 +95,9 @@ func (p *Prompt) refresh(options RefreshOptions) {
 		start := time.Now()
 		defer func() { p.refreshTimings = append(p.refreshTimings, float64(time.Since(start).Nanoseconds())) }()
 	}
+	if options == RefreshAll {
+		p.renderer.out.EraseDown()
+	}
 	if options&RefreshUpdate == RefreshUpdate {
 		p.completion.Update(*p.buf.Document())
 		p.renderer.Render(p.buf, p.completion, p.lexer)
@@ -176,7 +179,7 @@ func (p *Prompt) Run() {
 			}
 		case w := <-winSizeCh:
 			p.renderer.UpdateWinSize(w)
-			p.refresh(RefreshRender | RefreshStatusBar)
+			p.refresh(RefreshAll)
 		case code := <-exitCh:
 			p.renderer.BreakLine(p.buf, p.lexer)
 			p.tearDown()

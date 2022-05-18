@@ -40,12 +40,16 @@ func (els StatusBar) fit(maxWidth int) StatusBar {
 	realElastic, adjustedElastic := els.countElastic()
 	elastics, elasticsIndex := distribute(delta, adjustedElastic), 0
 	excess := 0
+	l := len(els)
+	clones := make(StatusBar, l)
 	for i, el := range els {
-		if !el.isElastic(i, len(els), realElastic) {
+		clone := el
+		clones[i] = clone
+		if !el.isElastic(i, l, realElastic) {
 			continue
 		}
 		remainder := 0
-		els[i], remainder = el.fit(elastics[elasticsIndex])
+		clones[i], remainder = clone.fit(elastics[elasticsIndex])
 		remainder *= factor
 		if remainder > 0 {
 			if i+1 < adjustedElastic {
@@ -61,7 +65,7 @@ func (els StatusBar) fit(maxWidth int) StatusBar {
 	// TODO: finally, any remaining excess should be distributed across all elements
 	//       (applied in reverse) without adding more ellipses
 
-	return els
+	return clones
 }
 
 func (els StatusBar) contentWidth() (w int) {
