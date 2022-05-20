@@ -1,22 +1,16 @@
 package prompt
 
-import "strings"
+func (r *Render) renderLexable(line string, lexer *Lexer) {
+	els := lexer.Process(line)
+	r.renderLexed(els)
+}
 
-func (r *Render) renderLexed(line string, lexer *Lexer) {
-	processed := lexer.Process(line)
-	s := line
-
-	for _, v := range processed {
+func (r *Render) renderLexed(els []LexerElement) {
+	for _, v := range els {
 		if v.Text == "" {
 			continue
 		}
-		a := strings.SplitAfter(s, v.Text)
-		if len(a) == 0 {
-			continue
-		}
-		s = strings.TrimPrefix(s, a[0])
-
 		r.out.SetColor(v.TextColor, v.BGColor, false)
-		r.out.WriteStr(a[0])
+		r.out.WriteStr(v.Text)
 	}
 }

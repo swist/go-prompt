@@ -104,7 +104,7 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 
 	// Render lexed input line if lexing is enabled
 	if lexer.IsEnabled {
-		r.renderLexed(line, lexer)
+		r.renderLexable(line, lexer)
 	} else {
 		r.out.SetColor(r.inputTextColor, r.inputBGColor, false)
 		r.out.WriteStr(line)
@@ -143,7 +143,7 @@ func (r *Render) BreakLine(buffer *Buffer, lexer *Lexer) {
 	r.renderPrefix(buffer, true)
 
 	if lexer.IsEnabled {
-		r.renderLexed(line, lexer)
+		r.renderLexable(line, lexer)
 	} else {
 		r.out.SetColor(r.inputTextColor, r.inputBGColor, false)
 		r.out.WriteStr(line)

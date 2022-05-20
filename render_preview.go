@@ -15,7 +15,7 @@ func (r *Render) renderPreview(buffer *Buffer, completion *CompletionManager, le
 		rest := buffer.Document().TextAfterCursor()
 
 		if lexer.IsEnabled {
-			r.renderLexed(rest, lexer)
+			r.renderLexable(rest, lexer)
 		} else {
 			r.out.WriteStr(rest)
 		}
