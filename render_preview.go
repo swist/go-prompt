@@ -1,6 +1,8 @@
 package prompt
 
-import runewidth "github.com/mattn/go-runewidth"
+import (
+	runewidth "github.com/mattn/go-runewidth"
+)
 
 func (r *Render) renderPreview(buffer *Buffer, completion *CompletionManager, lexer *Lexer, cursor int) int {
 	if suggest, ok := completion.GetSelectedSuggestion(); ok {

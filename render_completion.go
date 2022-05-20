@@ -20,7 +20,7 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 	if completionHeight > int(completions.max) {
 		completionHeight = int(completions.max)
 	}
-	formatted, width, leftWidth, rightWidth := formatSuggestions(suggestions, maxWidth, completions.verticalScroll, completionHeight, r.stringCaches)
+	formatted, width, leftWidth, centerWidth, rightWidth := formatSuggestions(suggestions, maxWidth, completions.verticalScroll, completionHeight, r.stringCaches)
 	width += scrollBarWidth
 
 	showingLast := completions.verticalScroll+completionHeight == len(suggestions)
@@ -28,7 +28,10 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 	if selected >= 0 && completions.expandDescriptions {
 		selectedSuggest := suggestions[completions.selected]
 		desc := selectedSuggest.Description
-		formatted = r.expandDescription(formatted, desc, int(completions.max), rightWidth, leftWidth)
+		if selectedSuggest.ExpandedDescription != "" {
+			desc = selectedSuggest.ExpandedDescription
+		}
+		formatted = r.expandDescription(formatted, desc, int(completions.max), rightWidth, leftWidth, centerWidth)
 		completionHeight = len(formatted)
 	}
 
@@ -63,7 +66,6 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 		return scrollbarTop <= row && row < scrollbarTop+scrollbarHeight
 	}
 
-	r.out.SetColor(White, Cyan, false)
 	for i := 0; i < completionHeight; i++ {
 		r.out.CursorDown(1)
 		tfg, tbg := r.suggestionTextColor, r.suggestionBGColor
@@ -73,6 +75,7 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 			tfg, tbg = r.getSuggestionTypeColor(formatted[i].Type)
 		}
 		r.renderMarkup(formatted[i].Text, tfg, tbg)
+		r.renderMarkup(formatted[i].Note, tfg, tbg)
 
 		dfg, dbg := r.descriptionTextColor, r.descriptionBGColor
 		if i == selected && !completions.expandDescriptions {
@@ -123,8 +126,9 @@ func (r *Render) renderMarkup(s string, fg Color, bg Color) {
 		}
 		begin = match[1]
 		r.out.SetColor(fg, bg, true)
-		r.out.WriteStr(s[match[0]+1 : match[1]-1])
+		out := s[match[0]+1 : match[1]-1]
 		pad += 2
+		r.out.WriteStr(out)
 		r.out.SetColor(fg, bg, false)
 	}
 

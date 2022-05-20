@@ -9,6 +9,8 @@ const (
 	shortenSuffix = "..."
 	leftPrefix    = " "
 	leftSuffix    = " "
+	centerPrefix  = " "
+	centerSuffix  = " "
 	rightPrefix   = " "
 	rightSuffix   = " "
 )
@@ -22,18 +24,21 @@ const (
 
 var (
 	leftMargin       = runewidth.StringWidth(leftPrefix + leftSuffix)
+	centerMargin     = runewidth.StringWidth(centerPrefix + centerSuffix)
 	rightMargin      = runewidth.StringWidth(rightPrefix + rightSuffix)
-	completionMargin = leftMargin + rightMargin
+	completionMargin = leftMargin + centerMargin + rightMargin
 )
 
 // Suggest is printed when completing.
 type Suggest struct {
-	Text        string
-	Description string
-	Type        SuggestType
-	Context     interface{}             `json:"-"`
-	OnSelected  func(s Suggest) Suggest `json:"-"`
-	OnCommitted func(s Suggest) Suggest `json:"-"`
+	Text                string
+	Note                string
+	Description         string
+	ExpandedDescription string
+	Type                SuggestType
+	Context             interface{}             `json:"-"`
+	OnSelected          func(s Suggest) Suggest `json:"-"`
+	OnCommitted         func(s Suggest) Suggest `json:"-"`
 }
 
 func (s *Suggest) selected() Suggest {

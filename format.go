@@ -85,7 +85,7 @@ func textsDimensions(texts []string, max int, prefix, suffix string, cache bool)
 	return d
 }
 
-func formatTexts(texts []string, max int, prefix, suffix string, d dimensions, offset, limit int, cache bool) ([]string, int) {
+func formatTexts(texts []string, max int, prefix, suffix string, d dimensions, offset, limit int, rightAlign, cache bool) ([]string, int) {
 	l := len(texts)
 	r := l - offset
 	if r < limit {
@@ -107,7 +107,13 @@ func formatTexts(texts []string, max int, prefix, suffix string, d dimensions, o
 		}
 		if d.widths[i] <= d.width {
 			spaces := strings.Repeat(" ", d.width-d.widths[i])
-			n[x] = prefix + texts[i] + spaces + suffix
+			n[x] = prefix
+			if rightAlign {
+				n[x] += spaces + texts[i]
+			} else {
+				n[x] += texts[i] + spaces
+			}
+			n[x] += suffix
 		} else if d.widths[i] > d.width {
 			s := runewidth.Truncate(texts[i], d.width, shortenSuffix)
 			// When calling runewidth.Truncate("您好xxx您好xxx", 11, "...") returns "您好xxx..."
@@ -121,7 +127,7 @@ func formatTexts(texts []string, max int, prefix, suffix string, d dimensions, o
 	return n, d.prefix + d.width + d.suffix
 }
 
-func formatSuggestions(suggests []Suggest, max, offset, limit int, cache bool) ([]Suggest, int, int, int) {
+func formatSuggestions(suggests []Suggest, max, offset, limit int, cache bool) ([]Suggest, int, int, int, int) {
 	num := len(suggests)
 
 	left := make([]string, num)
@@ -130,26 +136,36 @@ func formatSuggestions(suggests []Suggest, max, offset, limit int, cache bool) (
 	}
 
 	d := textsDimensions(left, max, leftPrefix, leftSuffix, cache)
-	left, leftWidth := formatTexts(left, max, leftPrefix, leftSuffix, d, offset, limit, cache)
+	left, leftWidth := formatTexts(left, max, leftPrefix, leftSuffix, d, offset, limit, false, cache)
 	if leftWidth == 0 {
-		return []Suggest{}, 0, 0, 0
+		return []Suggest{}, 0, 0, 0, 0
 	}
+
+	center := make([]string, num)
+	for i := 0; i < num; i++ {
+		center[i] = suggests[i].Note
+	}
+
+	max = max - leftWidth
+	d = textsDimensions(center, max, centerPrefix, centerSuffix, cache)
+	center, centerWidth := formatTexts(center, max, centerPrefix, centerSuffix, d, offset, limit, true, cache)
 
 	right := make([]string, num)
 	for i := 0; i < num; i++ {
 		right[i] = suggests[i].Description
 	}
 
-	d = textsDimensions(right, max-leftWidth, rightPrefix, rightSuffix, cache)
-	right, rightWidth := formatTexts(right, max-leftWidth, rightPrefix, rightSuffix, d, offset, limit, cache)
+	max = max - centerWidth
+	d = textsDimensions(right, max, rightPrefix, rightSuffix, cache)
+	right, rightWidth := formatTexts(right, max, rightPrefix, rightSuffix, d, offset, limit, false, cache)
 
 	l := len(left)
 	new := make([]Suggest, l)
 	for i := 0; i < l; i++ {
-		new[i] = Suggest{Text: left[i], Description: right[i], Type: suggests[i].Type}
+		new[i] = Suggest{Text: left[i], Note: center[i], Description: right[i], Type: suggests[i].Type}
 	}
 
-	return new, leftWidth + rightWidth, leftWidth, rightWidth
+	return new, leftWidth + centerWidth + rightWidth, leftWidth, centerWidth, rightWidth
 }
 
 func deleteBreakLineCharacters(s string) string {

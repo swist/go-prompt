@@ -6,7 +6,7 @@ import (
 	"unicode"
 )
 
-func (r *Render) expandDescription(formatted []Suggest, expand string, mh int, mw int, leftWidth int) []Suggest {
+func (r *Render) expandDescription(formatted []Suggest, expand string, mh, mw, leftWidth, centerWidth int) []Suggest {
 	if mh <= 0 || mw <= 2 {
 		return formatted
 	}
@@ -44,13 +44,16 @@ func (r *Render) expandDescription(formatted []Suggest, expand string, mh int, m
 			desc = strings.Repeat(" ", mw+2)
 		}
 		text := strings.Repeat(" ", leftWidth)
+		note := strings.Repeat(" ", centerWidth)
 		var typ SuggestType = SuggestTypeDefault
 		if i < lf {
 			text = formatted[i].Text
+			note = formatted[i].Note
 			typ = formatted[i].Type
 		}
 		reformatted = append(reformatted, Suggest{
 			Text:        text,
+			Note:        note,
 			Description: desc,
 			Type:        typ,
 		})
