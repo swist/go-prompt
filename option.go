@@ -353,6 +353,13 @@ func OptionEnableRenderCaches(enable bool) Option {
 	}
 }
 
+func OptionEnableMarkup(enable bool) Option {
+	return func(p *Prompt) error {
+		p.renderer.enableMarkup = enable
+		return nil
+	}
+}
+
 // New returns a Prompt with powerful auto-completion.
 func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 	defaultWriter := NewStdoutWriter()

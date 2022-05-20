@@ -2,6 +2,8 @@ package prompt
 
 import (
 	"math"
+	"regexp"
+	"strings"
 
 	runewidth "github.com/mattn/go-runewidth"
 )
@@ -25,7 +27,8 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 	selected := completions.selected - completions.verticalScroll
 	if selected >= 0 && completions.expandDescriptions {
 		selectedSuggest := suggestions[completions.selected]
-		formatted = r.expandDescription(formatted, selectedSuggest.Description, int(completions.max), rightWidth, leftWidth)
+		desc := selectedSuggest.Description
+		formatted = r.expandDescription(formatted, desc, int(completions.max), rightWidth, leftWidth)
 		completionHeight = len(formatted)
 	}
 
@@ -63,25 +66,21 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 	r.out.SetColor(White, Cyan, false)
 	for i := 0; i < completionHeight; i++ {
 		r.out.CursorDown(1)
+		tfg, tbg := r.suggestionTextColor, r.suggestionBGColor
 		if i == selected {
-			r.out.SetColor(r.selectedSuggestionTextColor, r.selectedSuggestionBGColor, true)
+			tfg, tbg = r.selectedSuggestionTextColor, r.selectedSuggestionBGColor
 		} else if formatted[i].Type != SuggestTypeDefault {
-			textColor, bgColor := r.getSuggestionTypeColor(formatted[i].Type)
-			r.out.SetColor(textColor, bgColor, false)
-		} else {
-			r.out.SetColor(r.suggestionTextColor, r.suggestionBGColor, false)
+			tfg, tbg = r.getSuggestionTypeColor(formatted[i].Type)
 		}
-		r.out.WriteStr(formatted[i].Text)
+		r.renderMarkup(formatted[i].Text, tfg, tbg)
 
+		dfg, dbg := r.descriptionTextColor, r.descriptionBGColor
 		if i == selected && !completions.expandDescriptions {
-			r.out.SetColor(r.selectedDescriptionTextColor, r.selectedDescriptionBGColor, false)
+			dfg, dbg = r.selectedDescriptionTextColor, r.selectedDescriptionBGColor
 		} else if formatted[i].Type != SuggestTypeDefault && (!completions.expandDescriptions || selected < 0) {
-			textColor, bgColor := r.getSuggestionTypeColor(formatted[i].Type)
-			r.out.SetColor(textColor, bgColor, false)
-		} else {
-			r.out.SetColor(r.descriptionTextColor, r.descriptionBGColor, false)
+			dfg, dbg = r.getSuggestionTypeColor(formatted[i].Type)
 		}
-		r.out.WriteStr(formatted[i].Description)
+		r.renderMarkup(formatted[i].Description, dfg, dbg)
 
 		if isScrollThumb(i) {
 			r.out.SetColor(DefaultColor, r.scrollbarThumbColor, false)
@@ -101,6 +100,41 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 
 	r.out.CursorUp(completionHeight)
 	r.out.SetColor(DefaultColor, DefaultColor, false)
+}
+
+var boldRe = regexp.MustCompile(`\x60((?:[^\x60\\]|\\.)*)\x60`)
+
+func (r *Render) renderMarkup(s string, fg Color, bg Color) {
+	r.out.SetColor(fg, bg, false)
+	if !r.enableMarkup {
+		r.out.WriteStr(s)
+		return
+	}
+
+	// pad is a cheap trick to make up for the fact that text dimensions were computed before
+	// parsing the markup; this could be done in a better way that would yield nicer results
+	pad := 0
+
+	begin, end := 0, 0
+	for _, match := range boldRe.FindAllStringIndex(s, -1) {
+		end = match[0]
+		if match[1] != 0 {
+			r.out.WriteStr(s[begin:end])
+		}
+		begin = match[1]
+		r.out.SetColor(fg, bg, true)
+		r.out.WriteStr(s[match[0]+1 : match[1]-1])
+		pad += 2
+		r.out.SetColor(fg, bg, false)
+	}
+
+	if end != len(s) {
+		r.out.WriteStr(s[begin:])
+	}
+
+	if pad > 0 {
+		r.out.WriteStr(strings.Repeat(" ", pad))
+	}
 }
 
 func (r *Render) getSuggestionTypeColor(typ SuggestType) (textColor, bgColor Color) {

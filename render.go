@@ -22,6 +22,7 @@ type Render struct {
 	stringCaches       bool
 	statusBar          StatusBar
 	allocatedLines     int
+	enableMarkup       bool
 
 	previousCursor int
 
