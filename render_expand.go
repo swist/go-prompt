@@ -6,7 +6,7 @@ import (
 	"unicode"
 )
 
-func (r *Render) expandDescription(formatted []Suggest, expand string, mh, mw, leftWidth, centerWidth int) []Suggest {
+func (r *Render) expandDescription(formatted []Suggest, expand string, mh, mw, leftWidth, centerWidth int, cache bool) []Suggest {
 	if mh <= 0 || mw <= 2 {
 		return formatted
 	}
@@ -30,11 +30,11 @@ func (r *Render) expandDescription(formatted []Suggest, expand string, mh, mw, l
 				desc = "..."
 			} else {
 				desc = wrapped[i]
-				if len(desc) > mw {
-					desc = desc[:mw-3] + "..."
+				if runeWidth(desc, cache) > mw {
+					desc = truncate(desc, mw, "", "", cache)
 				}
 			}
-			w := mw - len(desc)
+			w := mw - runeWidth(desc, cache)
 			if w < 0 {
 				w = 0
 			}
@@ -43,13 +43,12 @@ func (r *Render) expandDescription(formatted []Suggest, expand string, mh, mw, l
 		} else {
 			desc = strings.Repeat(" ", mw+2)
 		}
-		text := strings.Repeat(" ", leftWidth)
-		note := strings.Repeat(" ", centerWidth)
-		var typ SuggestType = SuggestTypeDefault
-		if i < lf {
-			text = formatted[i].Text
-			note = formatted[i].Note
-			typ = formatted[i].Type
+		text := formatted[i].Text
+		note := formatted[i].Note
+		typ := formatted[i].Type
+		if i >= lf {
+			text = strings.Repeat(" ", leftWidth)
+			note = strings.Repeat(" ", centerWidth)
 		}
 		reformatted = append(reformatted, Suggest{
 			Text:        text,
@@ -64,6 +63,7 @@ func (r *Render) expandDescription(formatted []Suggest, expand string, mh, mw, l
 
 func wrap(s string, lim uint) string {
 	esc := false
+	bold := false
 
 	init := make([]byte, 0, len(s))
 	buf := bytes.NewBuffer(init)
@@ -82,6 +82,11 @@ func wrap(s string, lim uint) string {
 			if char == 'm' {
 				esc = false
 			}
+			wordBuf.WriteRune(char)
+			continue
+		}
+		if char == BOLD_MARKER {
+			bold = !bold
 			wordBuf.WriteRune(char)
 			continue
 		}
@@ -124,7 +129,16 @@ func wrap(s string, lim uint) string {
 			wordBufLen++
 
 			if current+wordBufLen+spaceBufLen > lim && wordBufLen < lim {
-				buf.WriteRune('\n')
+				if bold {
+					// preserve bold markers across line breaks
+					// TODO: this doesn't yet seem to catch all cases... perhaps when multiple lines
+					//       wrap within one bolded region?  haven't gotten tot he bottom of that yet
+					buf.WriteRune(BOLD_MARKER)
+					buf.WriteRune('\n')
+					buf.WriteRune(BOLD_MARKER)
+				} else {
+					buf.WriteRune('\n')
+				}
 				current = 0
 				spaceBuf.Reset()
 				spaceBufLen = 0

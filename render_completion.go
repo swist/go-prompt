@@ -3,7 +3,6 @@ package prompt
 import (
 	"math"
 	"regexp"
-	"strings"
 
 	runewidth "github.com/mattn/go-runewidth"
 )
@@ -31,7 +30,7 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 		if selectedSuggest.ExpandedDescription != "" {
 			desc = selectedSuggest.ExpandedDescription
 		}
-		formatted = r.expandDescription(formatted, desc, int(completions.max), rightWidth, leftWidth, centerWidth)
+		formatted = r.expandDescription(formatted, desc, int(completions.max), rightWidth, leftWidth, centerWidth, r.stringCaches)
 		completionHeight = len(formatted)
 	}
 
@@ -105,7 +104,7 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 	r.out.SetColor(DefaultColor, DefaultColor, false)
 }
 
-var boldRe = regexp.MustCompile(`\x60((?:[^\x60\\]|\\.)*)\x60`)
+var boldRe = regexp.MustCompile("\u200b([^\u200b]+)\u200b")
 
 func (r *Render) renderMarkup(s string, fg Color, bg Color) {
 	r.out.SetColor(fg, bg, false)
@@ -114,11 +113,8 @@ func (r *Render) renderMarkup(s string, fg Color, bg Color) {
 		return
 	}
 
-	// pad is a cheap trick to make up for the fact that text dimensions were computed before
-	// parsing the markup; this could be done in a better way that would yield nicer results
-	pad := 0
-
 	begin, end := 0, 0
+	zw := len("\u200b")
 	for _, match := range boldRe.FindAllStringIndex(s, -1) {
 		end = match[0]
 		if match[1] != 0 {
@@ -126,18 +122,13 @@ func (r *Render) renderMarkup(s string, fg Color, bg Color) {
 		}
 		begin = match[1]
 		r.out.SetColor(fg, bg, true)
-		out := s[match[0]+1 : match[1]-1]
-		pad += 2
+		out := s[match[0]+zw : match[1]-zw]
 		r.out.WriteStr(out)
 		r.out.SetColor(fg, bg, false)
 	}
 
 	if end != len(s) {
 		r.out.WriteStr(s[begin:])
-	}
-
-	if pad > 0 {
-		r.out.WriteStr(strings.Repeat(" ", pad))
 	}
 }
 

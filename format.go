@@ -8,6 +8,9 @@ import (
 
 type stringWidthCache map[string]int
 
+// We use the zero width space unicode char to designate bold region start/stop
+const BOLD_MARKER = '\u200b'
+
 func (sw stringWidthCache) get(s string) int {
 	if s == "" {
 		return 0
@@ -114,17 +117,40 @@ func formatTexts(texts []string, max int, prefix, suffix string, d dimensions, o
 				n[x] += texts[i] + spaces
 			}
 			n[x] += suffix
-		} else if d.widths[i] > d.width {
-			s := runewidth.Truncate(texts[i], d.width, shortenSuffix)
-			// When calling runewidth.Truncate("您好xxx您好xxx", 11, "...") returns "您好xxx..."
-			// But the length of this result is 10. So we need fill right using runewidth.FillRight.
-			n[x] = prefix + runewidth.FillRight(s, d.width) + suffix
+		} else {
+			n[x] = truncate(texts[i], d.width, prefix, suffix, cache)
 		}
 		if cache {
 			fsCache.set(texts[i], d.width, n[x])
 		}
 	}
 	return n, d.prefix + d.width + d.suffix
+}
+
+func truncate(s string, w int, prefix, suffix string, cache bool) string {
+	// If truncation interrupts a bold sequence, we need to close that sequence
+	// before appending the shorten suffix
+	tail := shortenSuffix
+	lt := runeWidth(tail, cache)
+	bold := false
+	x := 0
+	for _, c := range s {
+		if c == BOLD_MARKER {
+			bold = !bold
+			continue
+		}
+		if x+lt == w-1 {
+			if bold {
+				tail = string(BOLD_MARKER) + tail
+			}
+			break
+		}
+		x++
+	}
+	t := runewidth.Truncate(s, w, tail)
+	// When calling runewidth.Truncate("您好xxx您好xxx", 11, "...") returns "您好xxx..."
+	// But the length of this result is 10. So we need fill right using runewidth.FillRight.
+	return prefix + runewidth.FillRight(t, w) + suffix
 }
 
 func formatSuggestions(suggests []Suggest, max, offset, limit int, cache bool) ([]Suggest, int, int, int, int) {
