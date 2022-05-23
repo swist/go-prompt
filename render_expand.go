@@ -43,12 +43,13 @@ func (r *Render) expandDescription(formatted []Suggest, expand string, mh, mw, l
 		} else {
 			desc = strings.Repeat(" ", mw+2)
 		}
-		text := formatted[i].Text
-		note := formatted[i].Note
-		typ := formatted[i].Type
-		if i >= lf {
-			text = strings.Repeat(" ", leftWidth)
-			note = strings.Repeat(" ", centerWidth)
+		text := strings.Repeat(" ", leftWidth)
+		note := strings.Repeat(" ", centerWidth)
+		var typ SuggestType = SuggestTypeDefault
+		if i < lf {
+			text = formatted[i].Text
+			note = formatted[i].Note
+			typ = formatted[i].Type
 		}
 		reformatted = append(reformatted, Suggest{
 			Text:        text,
