@@ -67,7 +67,7 @@ type Exec struct {
 }
 
 func (p *Prompt) MustDestroy() {
-	if err := p.in.Destroy(); err != nil {
+	if err := p.Destroy(); err != nil {
 		panic(err)
 	}
 }
