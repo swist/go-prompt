@@ -3,6 +3,9 @@ package prompt
 import (
 	"bufio"
 	"bytes"
+	"fmt"
+
+	"github.com/c-bata/go-prompt/internal/debug"
 )
 
 // WinSize represents the width and height of terminal.
@@ -34,6 +37,7 @@ func (r *ConsoleParserReader) Read(p []byte) (n int, err error) {
 	if err != nil {
 		return 0, err
 	}
+	debug.Log(fmt.Sprintf("Read bytes: %x", b))
 	n = copy(p, b)
 	return n, nil
 }
@@ -182,7 +186,7 @@ var ASCIISequences = []*ASCIICode{
 	{Key: ShiftLeft, ASCIICode: []byte{0x1b, 0x5b, 0x31, 0x3b, 0x32, 0x44}},
 
 	// Tmux sends following keystrokes when control+arrow is pressed, but for
-	// Emacs ansi-term sends the same sequences for normal arrow keys. Consider
+	// Bash ansi-term sends the same sequences for normal arrow keys. Consider
 	// it a normal arrow press, because that's more important.
 	{Key: Up, ASCIICode: []byte{0x1b, 0x4f, 0x41}},
 	{Key: Down, ASCIICode: []byte{0x1b, 0x4f, 0x42}},

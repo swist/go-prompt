@@ -2,7 +2,7 @@ package prompt
 
 import "testing"
 
-func TestEmacsKeyBindings(t *testing.T) {
+func TestDefaultKeyBindings(t *testing.T) {
 	buf := NewBuffer()
 	buf.InsertText("abcde", false, true)
 	if buf.cursorPosition != len("abcde") {
@@ -10,21 +10,20 @@ func TestEmacsKeyBindings(t *testing.T) {
 	}
 
 	// Go to the beginning of the line
-	applyEmacsKeyBind(buf, ControlA)
+	applyDefaultKeyBind(buf, ControlA)
 	if buf.cursorPosition != 0 {
 		t.Errorf("Want %d, but got %d", 0, buf.cursorPosition)
 	}
 
 	// Go to the end of the line
-	applyEmacsKeyBind(buf, ControlE)
+	applyDefaultKeyBind(buf, ControlE)
 	if buf.cursorPosition != len("abcde") {
 		t.Errorf("Want %d, but got %d", len("abcde"), buf.cursorPosition)
 	}
 }
 
-func applyEmacsKeyBind(buf *Buffer, key Key) {
-	for i := range emacsKeyBindings {
-		kb := emacsKeyBindings[i]
+func applyDefaultKeyBind(buf *Buffer, key Key) {
+	for _, kb := range defaultKeyBindings() {
 		if kb.Key == key {
 			kb.Fn(buf)
 		}

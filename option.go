@@ -394,7 +394,7 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 		history:        NewHistory(),
 		lexer:          NewLexer(),
 		completion:     NewCompletionManager(completer, 6),
-		keyBindMode:    EmacsKeyBind, // All the above assume that bash is running in the default Emacs setting
+		keyBindMode:    DefaultKeyBind,
 		refreshCh:      make(chan Refresh, 1000),
 		refreshTimings: []float64{},
 	}
