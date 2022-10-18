@@ -11,8 +11,14 @@ func (r *Render) renderPreview(buffer *Buffer, completion *CompletionManager, le
 
 		r.out.SetColor(r.previewSuggestionTextColor, r.previewSuggestionBGColor, false)
 		r.out.WriteStr(suggest.Text)
+		if suggest.Next != "" {
+			r.out.SetColor(DefaultColor, DefaultColor, false)
+			r.out.WriteStr(" ")
+			r.out.SetColor(r.previewNextTextColor, r.previewNextBGColor, false)
+			r.out.WriteStr(suggest.Next)
+		}
 		r.out.SetColor(DefaultColor, DefaultColor, false)
-		cursor += runewidth.StringWidth(suggest.Text)
+		cursor += runewidth.StringWidth(suggest.textWithNext())
 
 		rest := buffer.Document().TextAfterCursor()
 

@@ -35,34 +35,32 @@ type Suggest struct {
 	Note                string
 	Description         string
 	ExpandedDescription string
+	Next                string
 	Type                SuggestType
-	Context             interface{}             `json:"-"`
+	Context             map[string]interface{}  `json:"-"`
 	OnSelected          func(s Suggest) Suggest `json:"-"`
 	OnCommitted         func(s Suggest) Suggest `json:"-"`
 }
 
-func (s *Suggest) selected() Suggest {
+func (s Suggest) selected() Suggest {
 	if s.OnSelected != nil {
-		return s.OnSelected(*s)
+		return s.OnSelected(s)
 	}
-	return *s
+	return s
 }
 
-func (s *Suggest) committed() Suggest {
+func (s Suggest) committed() Suggest {
 	if s.OnCommitted != nil {
-		return s.OnCommitted(*s)
+		return s.OnCommitted(s)
 	}
-	return *s
+	return s
 }
 
-func (s *Suggest) CloneWithText(text string) Suggest {
-	return Suggest{
-		Text:        text,
-		Description: s.Description,
-		Context:     s.Context,
-		OnSelected:  s.OnSelected,
-		OnCommitted: s.OnCommitted,
+func (s Suggest) textWithNext() string {
+	if s.Next != "" {
+		return s.Text + " " + s.Next
 	}
+	return s.Text
 }
 
 // CompletionManager manages which suggestion is now selected.

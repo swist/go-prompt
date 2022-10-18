@@ -33,6 +33,8 @@ type Render struct {
 	inputBGColor                 Color
 	previewSuggestionTextColor   Color
 	previewSuggestionBGColor     Color
+	previewNextTextColor         Color
+	previewNextBGColor           Color
 	suggestionTextColor          Color
 	suggestionBGColor            Color
 	selectedSuggestionTextColor  Color

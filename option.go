@@ -126,6 +126,22 @@ func OptionPreviewSuggestionBGColor(x Color) Option {
 	}
 }
 
+// OptionPreviewSuggestionTextColor to change a text color which is completed.
+func OptionPreviewNextTextColor(x Color) Option {
+	return func(p *Prompt) error {
+		p.renderer.previewNextTextColor = x
+		return nil
+	}
+}
+
+// OptionPreviewSuggestionBGColor to change a background color which is completed.
+func OptionPreviewNextBGColor(x Color) Option {
+	return func(p *Prompt) error {
+		p.renderer.previewNextBGColor = x
+		return nil
+	}
+}
+
 // OptionSuggestionTextColor to change a text color in drop down suggestions.
 func OptionSuggestionTextColor(x Color) Option {
 	return func(p *Prompt) error {
@@ -376,6 +392,8 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 			inputBGColor:                 DefaultColor,
 			previewSuggestionTextColor:   Green,
 			previewSuggestionBGColor:     DefaultColor,
+			previewNextTextColor:         DarkGray,
+			previewNextBGColor:           DefaultColor,
 			suggestionTextColor:          White,
 			suggestionBGColor:            Cyan,
 			selectedSuggestionTextColor:  Black,
