@@ -1,9 +1,12 @@
 package prompt
 
-import "strings"
+import (
+	"strings"
+	runewidth "github.com/mattn/go-runewidth"
+)
 
-func (r *Render) renderLexable(line string, lexer *Lexer) {
-	els := lexer.Process(line)
+func (r *Render) renderLexable(d Document, lexer *Lexer) {
+	els := lexer.Process(d)
 	r.renderLexed(els)
 }
 
@@ -19,4 +22,27 @@ func (r *Render) renderLexed(els []LexerElement) {
 		}
 		r.out.WriteStr(s)
 	}
+}
+
+func (r *Render) renderLexedAfterCursor(lexed []LexerElement, cursor int) int {
+	rest := 0
+	pos := 0
+	var els []LexerElement
+	for _, el := range lexed {
+		tw := runewidth.StringWidth(el.Text)
+		if pos+tw <= cursor {
+			pos += tw
+		} else if pos < cursor && pos+tw > cursor {
+			w := cursor - pos
+			el.Text = el.Text[w:]
+			els = append(els, el)
+			pos += tw
+			rest += tw - w
+		} else {
+			els = append(els, el)
+			rest += tw
+		}
+	}
+	r.renderLexed(els)
+	return rest
 }

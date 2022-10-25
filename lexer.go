@@ -1,7 +1,7 @@
 package prompt
 
 // LexerFunc is a callback from render.
-type LexerFunc = func(line string) []LexerElement
+type LexerFunc = func(d Document) []LexerElement
 
 // LexerElement is a element of lexer.
 type LexerElement struct {
@@ -30,6 +30,6 @@ func (l *Lexer) SetLexerFunction(fn LexerFunc) {
 }
 
 // Process line with a custom function.
-func (l *Lexer) Process(line string) []LexerElement {
-	return l.fn(line)
+func (l *Lexer) Process(d Document) []LexerElement {
+	return l.fn(d)
 }

@@ -4,10 +4,10 @@ import (
 	runewidth "github.com/mattn/go-runewidth"
 )
 
-func (r *Render) renderPreview(buffer *Buffer, completion *CompletionManager, lexer *Lexer, cursor int) int {
+func (r *Render) renderPreview(d *Document, completion *CompletionManager, cursor int, lexed []LexerElement) int {
 	if suggest, ok := completion.GetSelectedSuggestion(); ok {
-		// r.out.EraseEndOfLine()
-		cursor = r.backward(cursor, runewidth.StringWidth(buffer.Document().GetWordBeforeCursorUntilSeparator(completion.wordSeparator)))
+		r.out.EraseEndOfLine()
+		cursor = r.backward(cursor, runewidth.StringWidth(d.GetWordBeforeCursorUntilSeparator(completion.wordSeparator)))
 
 		r.out.SetColor(r.previewSuggestionTextColor, r.previewSuggestionBGColor, false)
 		r.out.WriteStr(suggest.Text)
@@ -20,20 +20,21 @@ func (r *Render) renderPreview(buffer *Buffer, completion *CompletionManager, le
 		r.out.SetColor(DefaultColor, DefaultColor, false)
 		cursor += runewidth.StringWidth(suggest.textWithNext())
 
-		rest := buffer.Document().TextAfterCursor()
-
-		if lexer.IsEnabled {
-			r.renderLexable(rest, lexer)
+		rest := 0
+		if len(lexed) > 0 {
+			rest = r.renderLexedAfterCursor(lexed, d.cursorPosition)
 		} else {
-			r.out.WriteStr(rest)
+			s := d.TextAfterCursor()
+			rest = runewidth.StringWidth(s)
+			r.out.WriteStr(s)
 		}
 
 		r.out.SetColor(DefaultColor, DefaultColor, false)
 
-		cursor += runewidth.StringWidth(rest)
+		cursor += rest
 		r.lineWrap(cursor)
 
-		cursor = r.backward(cursor, runewidth.StringWidth(rest))
+		cursor = r.backward(cursor, rest)
 	}
 	return cursor
 }
