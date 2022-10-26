@@ -126,7 +126,7 @@ func OptionPreviewSuggestionBGColor(x Color) Option {
 	}
 }
 
-// OptionPreviewSuggestionTextColor to change a text color which is completed.
+// OptionPreviewNextTextColor OptionPreviewSuggestionTextColor to change a text color which is completed.
 func OptionPreviewNextTextColor(x Color) Option {
 	return func(p *Prompt) error {
 		p.renderer.previewNextTextColor = x
@@ -134,7 +134,7 @@ func OptionPreviewNextTextColor(x Color) Option {
 	}
 }
 
-// OptionPreviewSuggestionBGColor to change a background color which is completed.
+// OptionPreviewNextBGColor OptionPreviewSuggestionBGColor to change a background color which is completed.
 func OptionPreviewNextBGColor(x Color) Option {
 	return func(p *Prompt) error {
 		p.renderer.previewNextBGColor = x
@@ -206,7 +206,7 @@ func OptionSelectedDescriptionBGColor(x Color) Option {
 	}
 }
 
-// OptionLabelTextColor to change a text color of description which is selected inside suggestions drop down box.
+// OptionSuggestTypeLabelTextColor OptionLabelTextColor to change a text color of description which is selected inside suggestions drop down box.
 func OptionSuggestTypeLabelTextColor(x Color) Option {
 	return func(p *Prompt) error {
 		p.renderer.suggestTypeLabelTextColor = x
@@ -214,7 +214,7 @@ func OptionSuggestTypeLabelTextColor(x Color) Option {
 	}
 }
 
-// OptionLabelBGColor to change a background color of description which is selected inside suggestions drop down box.
+// OptionSuggestTypeLabelBGColor OptionLabelBGColor to change a background color of description which is selected inside suggestions drop down box.
 func OptionSuggestTypeLabelBGColor(x Color) Option {
 	return func(p *Prompt) error {
 		p.renderer.suggestTypeLabelBGColor = x
@@ -246,7 +246,7 @@ func OptionStatusBarTextColor(x Color) Option {
 	}
 }
 
-// OptionStatusBarTextColor sets the foreground color of the statusbar.
+// OptionStatusBarBGColor OptionStatusBarTextColor sets the foreground color of the statusbar.
 func OptionStatusBarBGColor(x Color) Option {
 	return func(p *Prompt) error {
 		p.renderer.statusBarBGColor = x
@@ -342,7 +342,7 @@ func OptionSetExitCheckerOnInput(fn ExitChecker) Option {
 // OptionSetLexer set lexer function and enable it.
 func OptionSetLexer(fn LexerFunc) Option {
 	return func(p *Prompt) error {
-		p.lexer.SetLexerFunction(fn)
+		p.lexer = &Lexer{fn}
 		return nil
 	}
 }
@@ -410,7 +410,6 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 		buf:            NewBuffer(),
 		executor:       executor,
 		history:        NewHistory(),
-		lexer:          NewLexer(),
 		completion:     NewCompletionManager(completer, 6),
 		keyBindMode:    DefaultKeyBind,
 		refreshCh:      make(chan Refresh, 1000),
@@ -421,6 +420,10 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 		if err := opt(pt); err != nil {
 			panic(err)
 		}
+	}
+
+	if pt.lexer == nil {
+		pt.lexer = NewLexer(pt.renderer.inputTextColor, pt.renderer.inputBGColor)
 	}
 
 	pt.in = NewStandardInputParser()

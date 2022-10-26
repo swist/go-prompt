@@ -97,7 +97,7 @@ func TestBreakLineCallback(t *testing.T) {
 		col:                          1,
 	}
 	b := NewBuffer()
-	l := NewLexer()
+	l := NewLexer(DefaultColor, DefaultColor)
 	r.BreakLine(b, l)
 
 	if i != 0 {

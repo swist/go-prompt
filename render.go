@@ -106,28 +106,27 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 	r.renderPrefix(buffer, false)
 	r.eraseArea(0)
 
-	// Render lexed input line if lexing is enabled
-	var lexed []LexerElement
-	if lexer.IsEnabled {
-		lexed = lexer.Process(*d)
-		r.renderLexed(lexed)
-	} else {
-		r.out.SetColor(r.inputTextColor, r.inputBGColor, false)
-		r.out.WriteStr(line)
-	}
+	// Render lexed input line
+	lexed := lexer.Process(*d)
+	left, right, _, back := splitLexedAtCursor(lexed, d.cursorPosition)
 
+	r.renderLexed(left)
 	if y == 0 {
+		// TODO: is this still needed?
 		r.out.EraseEndOfLine()
 	}
+	cursor = r.renderPreview(d, completion, cursor)
+	r.renderLexed(right)
 
 	// Prepare for render
 	r.out.SetColor(DefaultColor, DefaultColor, false)
 	r.lineWrap(cursor)
-	cursor = r.backward(cursor, runewidth.StringWidth(line)-buffer.DisplayCursorPosition())
+	cursor = r.backward(cursor, back)
 
 	// Render completion components
 	r.renderCompletion(buffer, completion)
-	r.previousCursor = r.renderPreview(d, completion, cursor, lexed)
+
+	r.previousCursor = cursor
 }
 
 // UpdateWinSize called when window size is changed.
@@ -146,13 +145,7 @@ func (r *Render) BreakLine(buffer *Buffer, lexer *Lexer) {
 	r.clear(cursor)
 
 	r.renderPrefix(buffer, true)
-
-	if lexer.IsEnabled {
-		r.renderLexable(*d, lexer)
-	} else {
-		r.out.SetColor(r.inputTextColor, r.inputBGColor, false)
-		r.out.WriteStr(d.Text)
-	}
+	r.renderLexable(*d, lexer)
 	r.out.WriteStr("\n")
 
 	r.out.SetColor(DefaultColor, DefaultColor, false)
@@ -202,7 +195,7 @@ func (r *Render) backward(from, n int) int {
 	return r.move(from, from-n)
 }
 
-// move moves cursor to specified position from the beginning of input
+// move cursor to specified position from the beginning of input
 // even if there is a line break.
 func (r *Render) move(from, to int) int {
 	fromX, fromY := r.toPos(from)

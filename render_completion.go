@@ -37,11 +37,16 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 	r.allocateArea(completionHeight + statusBarHeight)
 
 	pw := runewidth.StringWidth(prefix)
-	lw := pw + runewidth.StringWidth(buf.Document().Text)
+	d := buf.Document()
+	lw := pw + runewidth.StringWidth(d.Text)
 	_, y := r.toPos(lw)
 	r.eraseArea(y)
 
 	cursor := pw + runewidth.StringWidth(buf.Document().TextBeforeCursor())
+	if suggest, ok := completions.GetSelectedSuggestion(); ok {
+		sw := runewidth.StringWidth(d.GetWordBeforeCursorUntilSeparator(completions.wordSeparator))
+		cursor += runewidth.StringWidth(suggest.textWithNext()) - sw
+	}
 	x, _ := r.toPos(cursor)
 	if x+width >= int(r.col) {
 		cursor = r.backward(cursor, x+width-int(r.col))

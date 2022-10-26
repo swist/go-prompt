@@ -31,10 +31,10 @@ type Refresh struct {
 	StatusBar StatusBar
 }
 
-// RefreshChecker is called to determine whether or not to refresh the prompt.
+// RefreshChecker is called to determine whether to refresh the prompt.
 type RefreshChecker func(d *Document) bool
 
-// Completer should return the suggest item from Document.
+// Completer should return the Suggest item from Document.
 type Completer func(Document) []Suggest
 
 // Prompt is core struct of go-prompt.
