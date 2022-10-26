@@ -44,7 +44,8 @@ func (f formattedStringCache) set(s string, max int, v string) {
 	f[s][max] = v
 }
 
-var fsCache = formattedStringCache{}
+var fsCacheLeft = formattedStringCache{}
+var fsCacheRight = formattedStringCache{}
 
 type dimensions struct {
 	prefix  int
@@ -99,6 +100,10 @@ func formatTexts(texts []string, max int, prefix, suffix string, d dimensions, o
 	if d.width == 0 {
 		return n, 0
 	}
+	fsCache := fsCacheLeft
+	if rightAlign {
+		fsCache = fsCacheRight
+	}
 
 	for x := 0; x < limit; x++ {
 		i := offset + x
@@ -129,7 +134,7 @@ func formatTexts(texts []string, max int, prefix, suffix string, d dimensions, o
 
 func truncate(s string, w int, prefix, suffix string, cache bool) string {
 	// If truncation interrupts a bold sequence, we need to close that sequence
-	// before appending the shorten suffix
+	// before appending the shortenSuffix
 	tail := shortenSuffix
 	lt := runeWidth(tail, cache)
 	bold := false
@@ -186,12 +191,12 @@ func formatSuggestions(suggests []Suggest, max, offset, limit int, cache bool) (
 	right, rightWidth := formatTexts(right, max, rightPrefix, rightSuffix, d, offset, limit, false, cache)
 
 	l := len(left)
-	new := make([]Suggest, l)
+	list := make([]Suggest, l)
 	for i := 0; i < l; i++ {
-		new[i] = Suggest{Text: left[i], Note: center[i], Description: right[i], Type: suggests[i].Type}
+		list[i] = Suggest{Text: left[i], Note: center[i], Description: right[i], Type: suggests[i].Type}
 	}
 
-	return new, leftWidth + centerWidth + rightWidth, leftWidth, centerWidth, rightWidth
+	return list, leftWidth + centerWidth + rightWidth, leftWidth, centerWidth, rightWidth
 }
 
 func deleteBreakLineCharacters(s string) string {
