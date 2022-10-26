@@ -43,13 +43,22 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 	r.eraseArea(y)
 
 	cursor := pw + runewidth.StringWidth(buf.Document().TextBeforeCursor())
+	prw := 0
 	if suggest, ok := completions.GetSelectedSuggestion(); ok {
-		sw := runewidth.StringWidth(d.GetWordBeforeCursorUntilSeparator(completions.wordSeparator))
-		cursor += runewidth.StringWidth(suggest.textWithNext()) - sw
+		prw = runewidth.StringWidth(suggest.textWithNext())
+		offset := runewidth.StringWidth(d.GetWordBeforeCursorUntilSeparator(completions.wordSeparator))
+		prw = prw - offset
+		cursor += prw
 	}
-	x, _ := r.toPos(cursor)
+	x, h1 := r.toPos(cursor)
 	if x+width >= int(r.col) {
-		cursor = r.backward(cursor, x+width-int(r.col))
+		adj := x+width-int(r.col)
+		cursor = r.backward(cursor, adj)
+		prw -= adj
+		_, h2 := r.toPos(cursor-prw)
+		if h2 < h1 || prw < 0 {
+			prw = 0
+		}
 	}
 
 	contentHeight := len(completions.tmp)
@@ -70,6 +79,7 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 		return scrollbarTop <= row && row < scrollbarTop+scrollbarHeight
 	}
 
+	cursor = r.backward(cursor, prw)
 	for i := 0; i < completionHeight; i++ {
 		r.out.CursorDown(1)
 		tfg, tbg := r.suggestionTextColor, r.suggestionBGColor
@@ -100,6 +110,7 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 		r.lineWrap(cursor + width)
 		cursor = r.backward(cursor+width, width)
 	}
+	cursor = r.move(cursor, cursor+prw)
 
 	if x+width >= int(r.col) {
 		r.out.CursorForward(x + width - int(r.col))
