@@ -12,8 +12,9 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 	if len(suggestions) == 0 {
 		return
 	}
+	columns := int(r.col)
 	prefix := r.getCurrentPrefix(buf, false)
-	maxWidth := int(r.col) - runewidth.StringWidth(prefix) - scrollBarWidth
+	maxWidth := columns - runewidth.StringWidth(prefix) - scrollBarWidth
 	// TODO: should completion height be returned by formatSuggestions?
 	completionHeight := len(suggestions)
 	if completionHeight > int(completions.max) {
@@ -36,29 +37,38 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 
 	r.allocateArea(completionHeight + statusBarHeight)
 
-	pw := runewidth.StringWidth(prefix)
+	prefixWidth := runewidth.StringWidth(prefix)
 	d := buf.Document()
-	lw := pw + runewidth.StringWidth(d.Text)
+	lw := prefixWidth + runewidth.StringWidth(d.Text)
 	_, y := r.toPos(lw)
 	r.eraseArea(y)
 
-	cursor := pw + runewidth.StringWidth(buf.Document().TextBeforeCursor())
-	prw := 0
+	cursor := prefixWidth + runewidth.StringWidth(buf.Document().TextBeforeCursor())
+	previewWidth := 0
 	if suggest, ok := completions.GetSelectedSuggestion(); ok {
-		prw = runewidth.StringWidth(suggest.textWithNext())
+		previewWidth = runewidth.StringWidth(suggest.textWithNext())
+		// Account for the cursor offset into the previewWidth
 		offset := runewidth.StringWidth(d.GetWordBeforeCursorUntilSeparator(completions.wordSeparator))
-		prw = prw - offset
-		cursor += prw
+		previewWidth = previewWidth - offset
+		cursor += previewWidth
 	}
 	x, h1 := r.toPos(cursor)
-	if x+width >= int(r.col) {
-		adj := x+width-int(r.col)
+	if x+width >= columns {
+		// If the line position plus completion width is greater than the row width, rewind the cursor by the difference
+		adj := x + width - columns
 		cursor = r.backward(cursor, adj)
-		prw -= adj
-		_, h2 := r.toPos(cursor-prw)
-		if h2 < h1 || prw < 0 {
-			prw = 0
+		// The previewWidth is used later to rewind the cursor again for completion box alignment, so adjust it as well
+		previewWidth -= adj
+		_, h2 := r.toPos(cursor - previewWidth)
+		if previewWidth < 0 || h2 < h1 {
+			// If the preview width is negative or would cause the cursor to retreat to the previous line, disregard it
+			previewWidth = 0
 		}
+	} else if h1 > 0 && x < prefixWidth {
+		// If the cursor has wrapped to a newline but the x pos is less than the prefixWidth then we need to advance
+		// the cursor (by the complement of the x pos with the prefix width) instead of rewind it so that the completion
+		// view does not wrap backward to the previous line and is aligned with the prefix on the current line
+		previewWidth = x-prefixWidth
 	}
 
 	contentHeight := len(completions.tmp)
@@ -79,7 +89,7 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 		return scrollbarTop <= row && row < scrollbarTop+scrollbarHeight
 	}
 
-	cursor = r.backward(cursor, prw)
+	cursor = r.backward(cursor, previewWidth)
 	for i := 0; i < completionHeight; i++ {
 		r.out.CursorDown(1)
 		tfg, tbg := r.suggestionTextColor, r.suggestionBGColor
@@ -110,10 +120,10 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 		r.lineWrap(cursor + width)
 		cursor = r.backward(cursor+width, width)
 	}
-	cursor = r.move(cursor, cursor+prw)
+	cursor = r.move(cursor, cursor+previewWidth)
 
-	if x+width >= int(r.col) {
-		r.out.CursorForward(x + width - int(r.col))
+	if x+width >= columns {
+		r.out.CursorForward(x + width - columns)
 	}
 
 	r.out.CursorUp(completionHeight)
