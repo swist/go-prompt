@@ -6,9 +6,9 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-func (r *Render) renderInline(d *Document, completion *CompletionManager, preview string, cursor int) (int, int) {
+func (r *Render) renderInline(d *Document, completion *CompletionManager, cursor int) (int, int) {
 	width := 0
-	if completion.inline == "" || completion.inline == preview {
+	if completion.inline == "" {
 		return cursor, width
 	}
 	if !strings.HasSuffix(d.Text, " ") {

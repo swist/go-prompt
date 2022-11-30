@@ -117,9 +117,11 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Le
 	}
 	cursor, preview := r.renderPreview(d, completion, cursor)
 	r.renderLexed(right)
-	c, iw := r.renderInline(d, completion, preview, cursor)
-	cursor = c
-	back += iw
+	if preview == "" {
+		c, iw := r.renderInline(d, completion, cursor)
+		cursor = c
+		back += iw
+	}
 
 	// Prepare to render completion
 	r.out.SetColor(DefaultColor, DefaultColor, false)
