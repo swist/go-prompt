@@ -46,7 +46,7 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 	cursor := prefixWidth + runewidth.StringWidth(buf.Document().TextBeforeCursor())
 	previewWidth := 0
 	if suggest, ok := completions.GetSelectedSuggestion(); ok {
-		previewWidth = runewidth.StringWidth(suggest.textWithNext())
+		previewWidth = runewidth.StringWidth(suggest.Text)
 		// Account for the cursor offset into the previewWidth
 		offset := runewidth.StringWidth(d.GetWordBeforeCursorUntilSeparator(completions.wordSeparator))
 		previewWidth = previewWidth - offset
@@ -64,11 +64,11 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 			// If the preview width is negative or would cause the cursor to retreat to the previous line, disregard it
 			previewWidth = 0
 		}
-	} else if h1 > 0 && x < prefixWidth {
-		// If the cursor has wrapped to a newline but the x pos is less than the prefixWidth then we need to advance
+	} else if h1 > 0 && x < prefixWidth+previewWidth {
+		// If the cursor has wrapped to a newline but the x pos is less than the prefixWidth+previewWidth we need to advance
 		// the cursor (by the complement of the x pos with the prefix width) instead of rewind it so that the completion
 		// view does not wrap backward to the previous line and is aligned with the prefix on the current line
-		previewWidth = x-prefixWidth
+		previewWidth = x - prefixWidth
 	}
 
 	contentHeight := len(completions.tmp)
@@ -120,7 +120,7 @@ func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
 		r.lineWrap(cursor + width)
 		cursor = r.backward(cursor+width, width)
 	}
-	cursor = r.move(cursor, cursor+previewWidth)
+	_ = r.move(cursor, cursor+previewWidth)
 
 	if x+width >= columns {
 		r.out.CursorForward(x + width - columns)

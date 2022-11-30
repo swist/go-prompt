@@ -126,18 +126,18 @@ func OptionPreviewSuggestionBGColor(x Color) Option {
 	}
 }
 
-// OptionPreviewNextTextColor OptionPreviewSuggestionTextColor to change a text color which is completed.
-func OptionPreviewNextTextColor(x Color) Option {
+// OptionInlineTextColor to change a text color which is inlined at end of input.
+func OptionInlineTextColor(x Color) Option {
 	return func(p *Prompt) error {
-		p.renderer.previewNextTextColor = x
+		p.renderer.inlineTextColor = x
 		return nil
 	}
 }
 
-// OptionPreviewNextBGColor OptionPreviewSuggestionBGColor to change a background color which is completed.
-func OptionPreviewNextBGColor(x Color) Option {
+// OptionInlineBGColor to change a background color which is inlined at end of input.
+func OptionInlineBGColor(x Color) Option {
 	return func(p *Prompt) error {
-		p.renderer.previewNextBGColor = x
+		p.renderer.inlineBGColor = x
 		return nil
 	}
 }
@@ -388,12 +388,12 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 			livePrefixCallback:           func(*Document, bool) (string, bool) { return "", false },
 			prefixTextColor:              Blue,
 			prefixBGColor:                DefaultColor,
+			inlineTextColor:              DarkGray,
+			inlineBGColor:                DefaultColor,
 			inputTextColor:               DefaultColor,
 			inputBGColor:                 DefaultColor,
 			previewSuggestionTextColor:   Green,
 			previewSuggestionBGColor:     DefaultColor,
-			previewNextTextColor:         DarkGray,
-			previewNextBGColor:           DefaultColor,
 			suggestionTextColor:          White,
 			suggestionBGColor:            Cyan,
 			selectedSuggestionTextColor:  Black,

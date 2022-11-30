@@ -34,8 +34,8 @@ type Refresh struct {
 // RefreshChecker is called to determine whether to refresh the prompt.
 type RefreshChecker func(d *Document) bool
 
-// Completer should return the Suggest item from Document.
-type Completer func(Document) []Suggest
+// Completer should return the Suggest items and an optional inline value from Document.
+type Completer func(Document) ([]Suggest, string)
 
 // Prompt is core struct of go-prompt.
 type Prompt struct {
@@ -298,8 +298,7 @@ func (p *Prompt) handleCompletionKeyBinding(key Key, completing bool) {
 				p.buf.DeleteBeforeCursor(len([]rune(w)))
 			}
 			s = s.committed()
-			text := s.textWithNext()
-			p.buf.InsertText(text, false, true)
+			p.buf.InsertText(s.Text, false, true)
 		}
 		p.completion.Reset()
 	}
