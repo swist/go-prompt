@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 package prompt
@@ -59,7 +60,7 @@ func TestFormatCompletion(t *testing.T) {
 	}
 
 	for _, s := range scenarioTable {
-		ac, width := formatSuggestions(s.completions, s.maxWidth)
+		ac, width, _, _, _ := formatSuggestions(s.completions, s.maxWidth, 0, 100, false)
 		if !reflect.DeepEqual(ac, s.expected) {
 			t.Errorf("Should be %#v, but got %#v", s.expected, ac)
 		}
@@ -76,7 +77,7 @@ func TestBreakLineCallback(t *testing.T) {
 		out: &PosixWriter{
 			fd: syscall.Stdin, // "write" to stdin just so we don't mess with the output of the tests
 		},
-		livePrefixCallback:           func() (string, bool) { return "", false },
+		livePrefixCallback:           func(*Document, bool) (string, bool) { return "", false },
 		prefixTextColor:              Blue,
 		prefixBGColor:                DefaultColor,
 		inputTextColor:               DefaultColor,
@@ -96,7 +97,8 @@ func TestBreakLineCallback(t *testing.T) {
 		col:                          1,
 	}
 	b := NewBuffer()
-	r.BreakLine(b)
+	l := NewLexer(DefaultColor, DefaultColor)
+	r.BreakLine(b, l)
 
 	if i != 0 {
 		t.Errorf("i should initially be 0, before applying a break line callback")
@@ -105,9 +107,9 @@ func TestBreakLineCallback(t *testing.T) {
 	r.breakLineCallback = func(doc *Document) {
 		i++
 	}
-	r.BreakLine(b)
-	r.BreakLine(b)
-	r.BreakLine(b)
+	r.BreakLine(b, l)
+	r.BreakLine(b, l)
+	r.BreakLine(b, l)
 
 	if i != 3 {
 		t.Errorf("BreakLine callback not called, i should be 3")

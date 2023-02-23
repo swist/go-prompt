@@ -21,39 +21,6 @@ type KeyBindMode string
 const (
 	// CommonKeyBind is a mode without any keyboard shortcut
 	CommonKeyBind KeyBindMode = "common"
-	// EmacsKeyBind is a mode to use emacs-like keyboard shortcut
-	EmacsKeyBind KeyBindMode = "emacs"
+	// DefaultKeyBind is a mode to use bash-like keyboard shortcuts
+	DefaultKeyBind KeyBindMode = "default"
 )
-
-var commonKeyBindings = []KeyBind{
-	// Go to the End of the line
-	{
-		Key: End,
-		Fn:  GoLineEnd,
-	},
-	// Go to the beginning of the line
-	{
-		Key: Home,
-		Fn:  GoLineBeginning,
-	},
-	// Delete character under the cursor
-	{
-		Key: Delete,
-		Fn:  DeleteChar,
-	},
-	// Backspace
-	{
-		Key: Backspace,
-		Fn:  DeleteBeforeChar,
-	},
-	// Right allow: Forward one character
-	{
-		Key: Right,
-		Fn:  GoRightChar,
-	},
-	// Left allow: Backward one character
-	{
-		Key: Left,
-		Fn:  GoLeftChar,
-	},
-}

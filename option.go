@@ -37,7 +37,7 @@ func OptionPrefix(x string) Option {
 	}
 }
 
-// OptionInitialBufferText to set the initial buffer text
+// OptionInitialBufferText to set the initial buffer text.
 func OptionInitialBufferText(x string) Option {
 	return func(p *Prompt) error {
 		p.buf.InsertText(x, false, true)
@@ -53,15 +53,32 @@ func OptionCompletionWordSeparator(x string) Option {
 	}
 }
 
-// OptionLivePrefix to change the prefix dynamically by callback function
-func OptionLivePrefix(f func() (prefix string, useLivePrefix bool)) Option {
+// OptionCompletionExpandDescriptions to enable suggestion description expansion.
+func OptionCompletionExpandDescriptions(x bool) Option {
+	return func(p *Prompt) error {
+		p.completion.expandDescriptions = x
+		return nil
+	}
+}
+
+// OptionLivePrefix to change the prefix dynamically by callback function.
+func OptionLivePrefix(f func(doc *Document, isBreak bool) (prefix string, useLivePrefix bool)) Option {
 	return func(p *Prompt) error {
 		p.renderer.livePrefixCallback = f
 		return nil
 	}
 }
 
-// OptionPrefixTextColor change a text color of prefix string
+// OptionSanitizer sets a callback function to be called before executing the command. It may update the document
+// before execution.
+func OptionSanitizer(f func(d Document) Document) Option {
+	return func(p *Prompt) error {
+		p.sanitizer = f
+		return nil
+	}
+}
+
+// OptionPrefixTextColor change a text color of prefix string.
 func OptionPrefixTextColor(x Color) Option {
 	return func(p *Prompt) error {
 		p.renderer.prefixTextColor = x
@@ -69,7 +86,7 @@ func OptionPrefixTextColor(x Color) Option {
 	}
 }
 
-// OptionPrefixBackgroundColor to change a background color of prefix string
+// OptionPrefixBackgroundColor to change a background color of prefix string.
 func OptionPrefixBackgroundColor(x Color) Option {
 	return func(p *Prompt) error {
 		p.renderer.prefixBGColor = x
@@ -77,7 +94,7 @@ func OptionPrefixBackgroundColor(x Color) Option {
 	}
 }
 
-// OptionInputTextColor to change a color of text which is input by user
+// OptionInputTextColor to change a color of text which is input by user.
 func OptionInputTextColor(x Color) Option {
 	return func(p *Prompt) error {
 		p.renderer.inputTextColor = x
@@ -85,7 +102,7 @@ func OptionInputTextColor(x Color) Option {
 	}
 }
 
-// OptionInputBGColor to change a color of background which is input by user
+// OptionInputBGColor to change a color of background which is input by user.
 func OptionInputBGColor(x Color) Option {
 	return func(p *Prompt) error {
 		p.renderer.inputBGColor = x
@@ -93,7 +110,7 @@ func OptionInputBGColor(x Color) Option {
 	}
 }
 
-// OptionPreviewSuggestionTextColor to change a text color which is completed
+// OptionPreviewSuggestionTextColor to change a text color which is completed.
 func OptionPreviewSuggestionTextColor(x Color) Option {
 	return func(p *Prompt) error {
 		p.renderer.previewSuggestionTextColor = x
@@ -101,10 +118,26 @@ func OptionPreviewSuggestionTextColor(x Color) Option {
 	}
 }
 
-// OptionPreviewSuggestionBGColor to change a background color which is completed
+// OptionPreviewSuggestionBGColor to change a background color which is completed.
 func OptionPreviewSuggestionBGColor(x Color) Option {
 	return func(p *Prompt) error {
 		p.renderer.previewSuggestionBGColor = x
+		return nil
+	}
+}
+
+// OptionInlineTextColor to change a text color which is inlined at end of input.
+func OptionInlineTextColor(x Color) Option {
+	return func(p *Prompt) error {
+		p.renderer.inlineTextColor = x
+		return nil
+	}
+}
+
+// OptionInlineBGColor to change a background color which is inlined at end of input.
+func OptionInlineBGColor(x Color) Option {
+	return func(p *Prompt) error {
+		p.renderer.inlineBGColor = x
 		return nil
 	}
 }
@@ -173,6 +206,22 @@ func OptionSelectedDescriptionBGColor(x Color) Option {
 	}
 }
 
+// OptionSuggestTypeLabelTextColor OptionLabelTextColor to change a text color of description which is selected inside suggestions drop down box.
+func OptionSuggestTypeLabelTextColor(x Color) Option {
+	return func(p *Prompt) error {
+		p.renderer.suggestTypeLabelTextColor = x
+		return nil
+	}
+}
+
+// OptionSuggestTypeLabelBGColor OptionLabelBGColor to change a background color of description which is selected inside suggestions drop down box.
+func OptionSuggestTypeLabelBGColor(x Color) Option {
+	return func(p *Prompt) error {
+		p.renderer.suggestTypeLabelBGColor = x
+		return nil
+	}
+}
+
 // OptionScrollbarThumbColor to change a thumb color on scrollbar.
 func OptionScrollbarThumbColor(x Color) Option {
 	return func(p *Prompt) error {
@@ -185,6 +234,22 @@ func OptionScrollbarThumbColor(x Color) Option {
 func OptionScrollbarBGColor(x Color) Option {
 	return func(p *Prompt) error {
 		p.renderer.scrollbarBGColor = x
+		return nil
+	}
+}
+
+// OptionStatusBarTextColor sets the foreground color of the statusbar.
+func OptionStatusBarTextColor(x Color) Option {
+	return func(p *Prompt) error {
+		p.renderer.statusBarTextColor = x
+		return nil
+	}
+}
+
+// OptionStatusBarBGColor OptionStatusBarTextColor sets the foreground color of the statusbar.
+func OptionStatusBarBGColor(x Color) Option {
+	return func(p *Prompt) error {
+		p.renderer.statusBarBGColor = x
 		return nil
 	}
 }
@@ -250,7 +315,7 @@ func OptionShowCompletionAtStart() Option {
 	}
 }
 
-// OptionBreakLineCallback to run a callback at every break line
+// OptionBreakLineCallback to run a callback at every break line.
 func OptionBreakLineCallback(fn func(*Document)) Option {
 	return func(p *Prompt) error {
 		p.renderer.breakLineCallback = fn
@@ -258,10 +323,55 @@ func OptionBreakLineCallback(fn func(*Document)) Option {
 	}
 }
 
-// OptionSetExitCheckerOnInput set an exit function which checks if go-prompt exits its Run loop
+// OptionCancelLineCallback to run a callback at every line cancellation (ctrl-c).
+func OptionCancelLineCallback(fn func(*Document)) Option {
+	return func(p *Prompt) error {
+		p.cancelLineCallback = fn
+		return nil
+	}
+}
+
+// OptionSetExitCheckerOnInput set an exit function which checks if go-prompt exits its Run loop.
 func OptionSetExitCheckerOnInput(fn ExitChecker) Option {
 	return func(p *Prompt) error {
 		p.exitChecker = fn
+		return nil
+	}
+}
+
+// OptionSetLexer set lexer function and enable it.
+func OptionSetLexer(fn LexerFunc) Option {
+	return func(p *Prompt) error {
+		p.lexer = &Lexer{fn}
+		return nil
+	}
+}
+
+// OptionTtyFallbackErrors list of error strings to consider when falling back when opening tty fd fails.
+func OptionTtyFallbackErrors(errors []string) Option {
+	return func(p *Prompt) error {
+		ttyFallbackErrors = errors
+		return nil
+	}
+}
+
+func OptionCaptureRefreshTimings(enable bool) Option {
+	return func(p *Prompt) error {
+		p.captureRefreshTimings = enable
+		return nil
+	}
+}
+
+func OptionEnableRenderCaches(enable bool) Option {
+	return func(p *Prompt) error {
+		p.renderer.stringCaches = enable
+		return nil
+	}
+}
+
+func OptionEnableMarkup(enable bool) Option {
+	return func(p *Prompt) error {
+		p.renderer.enableMarkup = enable
 		return nil
 	}
 }
@@ -272,13 +382,14 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 	registerConsoleWriter(defaultWriter)
 
 	pt := &Prompt{
-		in: NewStandardInputParser(),
 		renderer: &Render{
 			prefix:                       "> ",
 			out:                          defaultWriter,
-			livePrefixCallback:           func() (string, bool) { return "", false },
+			livePrefixCallback:           func(*Document, bool) (string, bool) { return "", false },
 			prefixTextColor:              Blue,
 			prefixBGColor:                DefaultColor,
+			inlineTextColor:              DarkGray,
+			inlineBGColor:                DefaultColor,
 			inputTextColor:               DefaultColor,
 			inputBGColor:                 DefaultColor,
 			previewSuggestionTextColor:   Green,
@@ -293,12 +404,16 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 			selectedDescriptionBGColor:   Cyan,
 			scrollbarThumbColor:          DarkGray,
 			scrollbarBGColor:             Cyan,
+			suggestTypeLabelTextColor:    White,
+			suggestTypeLabelBGColor:      DarkGray,
 		},
-		buf:         NewBuffer(),
-		executor:    executor,
-		history:     NewHistory(),
-		completion:  NewCompletionManager(completer, 6),
-		keyBindMode: EmacsKeyBind, // All the above assume that bash is running in the default Emacs setting
+		buf:            NewBuffer(),
+		executor:       executor,
+		history:        NewHistory(),
+		completion:     NewCompletionManager(completer, 6),
+		keyBindMode:    DefaultKeyBind,
+		refreshCh:      make(chan Refresh, 1000),
+		refreshTimings: []float64{},
 	}
 
 	for _, opt := range opts {
@@ -306,5 +421,13 @@ func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 			panic(err)
 		}
 	}
+
+	if pt.lexer == nil {
+		pt.lexer = NewLexer(pt.renderer.inputTextColor, pt.renderer.inputBGColor)
+	}
+
+	pt.in = NewStandardInputParser()
+	pt.r = NewStandardInputReader(pt.in)
+
 	return pt
 }

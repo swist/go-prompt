@@ -24,3 +24,10 @@ _testmain.go
 
 # Glide
 vendor/
+
+# Snyk
+.dccache
+
+# JetBrains
+.idea
+*.iml

@@ -1,21 +1,28 @@
 package prompt
 
 import (
-	"runtime"
-
 	"github.com/c-bata/go-prompt/internal/debug"
 	runewidth "github.com/mattn/go-runewidth"
+)
+
+const (
+	scrollBarWidth  = 1
+	statusBarHeight = 1
 )
 
 // Render to render prompt information from state of Buffer.
 type Render struct {
 	out                ConsoleWriter
 	prefix             string
-	livePrefixCallback func() (prefix string, useLivePrefix bool)
-	breakLineCallback  func(*Document)
+	livePrefixCallback func(doc *Document, breakline bool) (prefix string, useLivePrefix bool)
+	breakLineCallback  func(doc *Document)
 	title              string
 	row                uint16
 	col                uint16
+	stringCaches       bool
+	statusBar          StatusBar
+	allocatedLines     int
+	enableMarkup       bool
 
 	previousCursor int
 
@@ -26,6 +33,8 @@ type Render struct {
 	inputBGColor                 Color
 	previewSuggestionTextColor   Color
 	previewSuggestionBGColor     Color
+	inlineTextColor              Color
+	inlineBGColor                Color
 	suggestionTextColor          Color
 	suggestionBGColor            Color
 	selectedSuggestionTextColor  Color
@@ -36,6 +45,10 @@ type Render struct {
 	selectedDescriptionBGColor   Color
 	scrollbarThumbColor          Color
 	scrollbarBGColor             Color
+	statusBarTextColor           Color
+	statusBarBGColor             Color
+	suggestTypeLabelTextColor    Color
+	suggestTypeLabelBGColor      Color
 }
 
 // Setup to initialize console output.
@@ -46,21 +59,6 @@ func (r *Render) Setup() {
 	}
 }
 
-// getCurrentPrefix to get current prefix.
-// If live-prefix is enabled, return live-prefix.
-func (r *Render) getCurrentPrefix() string {
-	if prefix, ok := r.livePrefixCallback(); ok {
-		return prefix
-	}
-	return r.prefix
-}
-
-func (r *Render) renderPrefix() {
-	r.out.SetColor(r.prefixTextColor, r.prefixBGColor, false)
-	r.out.WriteStr(r.getCurrentPrefix())
-	r.out.SetColor(DefaultColor, DefaultColor, false)
-}
-
 // TearDown to clear title and erasing.
 func (r *Render) TearDown() {
 	r.out.ClearTitle()
@@ -68,122 +66,32 @@ func (r *Render) TearDown() {
 	debug.AssertNoError(r.out.Flush())
 }
 
-func (r *Render) prepareArea(lines int) {
-	for i := 0; i < lines; i++ {
-		r.out.ScrollDown()
-	}
-	for i := 0; i < lines; i++ {
-		r.out.ScrollUp()
-	}
-}
-
-// UpdateWinSize called when window size is changed.
-func (r *Render) UpdateWinSize(ws *WinSize) {
-	r.row = ws.Row
-	r.col = ws.Col
-}
-
-func (r *Render) renderWindowTooSmall() {
-	r.out.CursorGoTo(0, 0)
-	r.out.EraseScreen()
-	r.out.SetColor(DarkRed, White, false)
-	r.out.WriteStr("Your console window is too small...")
-}
-
-func (r *Render) renderCompletion(buf *Buffer, completions *CompletionManager) {
-	suggestions := completions.GetSuggestions()
-	if len(completions.GetSuggestions()) == 0 {
-		return
-	}
-	prefix := r.getCurrentPrefix()
-	formatted, width := formatSuggestions(
-		suggestions,
-		int(r.col)-runewidth.StringWidth(prefix)-1, // -1 means a width of scrollbar
-	)
-	// +1 means a width of scrollbar.
-	width++
-
-	windowHeight := len(formatted)
-	if windowHeight > int(completions.max) {
-		windowHeight = int(completions.max)
-	}
-	formatted = formatted[completions.verticalScroll : completions.verticalScroll+windowHeight]
-	r.prepareArea(windowHeight)
-
-	cursor := runewidth.StringWidth(prefix) + runewidth.StringWidth(buf.Document().TextBeforeCursor())
-	x, _ := r.toPos(cursor)
-	if x+width >= int(r.col) {
-		cursor = r.backward(cursor, x+width-int(r.col))
-	}
-
-	contentHeight := len(completions.tmp)
-
-	fractionVisible := float64(windowHeight) / float64(contentHeight)
-	fractionAbove := float64(completions.verticalScroll) / float64(contentHeight)
-
-	scrollbarHeight := int(clamp(float64(windowHeight), 1, float64(windowHeight)*fractionVisible))
-	scrollbarTop := int(float64(windowHeight) * fractionAbove)
-
-	isScrollThumb := func(row int) bool {
-		return scrollbarTop <= row && row <= scrollbarTop+scrollbarHeight
-	}
-
-	selected := completions.selected - completions.verticalScroll
-	r.out.SetColor(White, Cyan, false)
-	for i := 0; i < windowHeight; i++ {
-		r.out.CursorDown(1)
-		if i == selected {
-			r.out.SetColor(r.selectedSuggestionTextColor, r.selectedSuggestionBGColor, true)
-		} else {
-			r.out.SetColor(r.suggestionTextColor, r.suggestionBGColor, false)
-		}
-		r.out.WriteStr(formatted[i].Text)
-
-		if i == selected {
-			r.out.SetColor(r.selectedDescriptionTextColor, r.selectedDescriptionBGColor, false)
-		} else {
-			r.out.SetColor(r.descriptionTextColor, r.descriptionBGColor, false)
-		}
-		r.out.WriteStr(formatted[i].Description)
-
-		if isScrollThumb(i) {
-			r.out.SetColor(DefaultColor, r.scrollbarThumbColor, false)
-		} else {
-			r.out.SetColor(DefaultColor, r.scrollbarBGColor, false)
-		}
-		r.out.WriteStr(" ")
-		r.out.SetColor(DefaultColor, DefaultColor, false)
-
-		r.lineWrap(cursor + width)
-		r.backward(cursor+width, width)
-	}
-
-	if x+width >= int(r.col) {
-		r.out.CursorForward(x + width - int(r.col))
-	}
-
-	r.out.CursorUp(windowHeight)
-	r.out.SetColor(DefaultColor, DefaultColor, false)
-}
-
 // Render renders to the console.
-func (r *Render) Render(buffer *Buffer, completion *CompletionManager) {
+func (r *Render) Render(buffer *Buffer, completion *CompletionManager, lexer *Lexer) {
 	// In situations where a pseudo tty is allocated (e.g. within a docker container),
 	// window size via TIOCGWINSZ is not immediately available and will result in 0,0 dimensions.
 	if r.col == 0 {
 		return
 	}
+
 	defer func() { debug.AssertNoError(r.out.Flush()) }()
+
+	d := buffer.Document()
+	line := d.Text
+	lw := runewidth.StringWidth(line)
+	rows := lw / int(r.col)
+	r.allocateArea(rows + statusBarHeight)
+	r.eraseArea(rows)
 	r.move(r.previousCursor, 0)
 
-	line := buffer.Text()
-	prefix := r.getCurrentPrefix()
-	cursor := runewidth.StringWidth(prefix) + runewidth.StringWidth(line)
+	// TODO: it feels like the above should account for the prefix width; investigate
+	prefix := r.getCurrentPrefix(buffer, false)
+	pw := runewidth.StringWidth(prefix)
+	cursor := pw + lw
 
-	// prepare area
+	// Ensure area size is large enough to work with
 	_, y := r.toPos(cursor)
-
-	h := y + 1 + int(completion.max)
+	h := y + int(completion.max) + statusBarHeight
 	if h > int(r.row) || completionMargin > int(r.col) {
 		r.renderWindowTooSmall()
 		return
@@ -193,50 +101,90 @@ func (r *Render) Render(buffer *Buffer, completion *CompletionManager) {
 	r.out.HideCursor()
 	defer r.out.ShowCursor()
 
-	r.renderPrefix()
-	r.out.SetColor(r.inputTextColor, r.inputBGColor, false)
-	r.out.WriteStr(line)
+	// TODO: reset to start of line (without messing up cursor tracking) to allow
+	//       for previous cursor to be overwritten if the prompt is restarted
+	r.renderPrefix(buffer, false)
+	r.eraseArea(0)
+
+	// Render lexed input line
+	lexed := lexer.Process(*d)
+	left, right, _, back := splitLexedAtCursor(lexed, d.cursorPosition)
+
+	r.renderLexed(left)
+	if y == 0 {
+		// TODO: is this still needed?
+		r.out.EraseEndOfLine()
+	}
+	cursor, preview := r.renderPreview(d, completion, cursor)
+	r.renderLexed(right)
+	if preview == "" {
+		c, iw := r.renderInline(d, completion, cursor)
+		cursor = c
+		back += iw
+	}
+
+	// Prepare to render completion
 	r.out.SetColor(DefaultColor, DefaultColor, false)
 	r.lineWrap(cursor)
+	cursor = r.backward(cursor, back)
 
-	r.out.EraseDown()
-
-	cursor = r.backward(cursor, runewidth.StringWidth(line)-buffer.DisplayCursorPosition())
-
+	// Render completion components
 	r.renderCompletion(buffer, completion)
-	if suggest, ok := completion.GetSelectedSuggestion(); ok {
-		cursor = r.backward(cursor, runewidth.StringWidth(buffer.Document().GetWordBeforeCursorUntilSeparator(completion.wordSeparator)))
 
-		r.out.SetColor(r.previewSuggestionTextColor, r.previewSuggestionBGColor, false)
-		r.out.WriteStr(suggest.Text)
-		r.out.SetColor(DefaultColor, DefaultColor, false)
-		cursor += runewidth.StringWidth(suggest.Text)
-
-		rest := buffer.Document().TextAfterCursor()
-		r.out.WriteStr(rest)
-		cursor += runewidth.StringWidth(rest)
-		r.lineWrap(cursor)
-
-		cursor = r.backward(cursor, runewidth.StringWidth(rest))
-	}
 	r.previousCursor = cursor
 }
 
+// UpdateWinSize called when window size is changed.
+func (r *Render) UpdateWinSize(ws *WinSize) {
+	r.row = ws.Row
+	r.col = ws.Col
+}
+
 // BreakLine to break line.
-func (r *Render) BreakLine(buffer *Buffer) {
+func (r *Render) BreakLine(buffer *Buffer, lexer *Lexer) {
+	d := buffer.Document()
+
 	// Erasing and Render
-	cursor := runewidth.StringWidth(buffer.Document().TextBeforeCursor()) + runewidth.StringWidth(r.getCurrentPrefix())
+	prefix := r.getCurrentPrefix(buffer, true)
+	cursor := runewidth.StringWidth(d.TextBeforeCursor()) + runewidth.StringWidth(prefix)
 	r.clear(cursor)
-	r.renderPrefix()
-	r.out.SetColor(r.inputTextColor, r.inputBGColor, false)
-	r.out.WriteStr(buffer.Document().Text + "\n")
+
+	r.renderPrefix(buffer, true)
+	r.renderLexable(*d, lexer)
+	r.out.WriteStr("\n")
+
 	r.out.SetColor(DefaultColor, DefaultColor, false)
+
 	debug.AssertNoError(r.out.Flush())
 	if r.breakLineCallback != nil {
-		r.breakLineCallback(buffer.Document())
+		r.breakLineCallback(d)
 	}
 
 	r.previousCursor = 0
+}
+
+func (r *Render) allocateArea(lines int) {
+	for i := 0; i < lines; i++ {
+		r.out.ScrollDown()
+	}
+	for i := 0; i < lines; i++ {
+		r.out.ScrollUp()
+	}
+	if r.allocatedLines < lines {
+		r.allocatedLines = lines
+	}
+}
+
+func (r *Render) eraseArea(skip int) {
+	r.out.SaveCursor()
+	defer r.out.UnSaveCursor()
+	lines := r.allocatedLines
+	for i := 0; i < lines; i++ {
+		r.out.CursorDown(1)
+		if i >= skip {
+			r.out.EraseLine()
+		}
+	}
 }
 
 // clear erases the screen from a beginning of input
@@ -252,7 +200,7 @@ func (r *Render) backward(from, n int) int {
 	return r.move(from, from-n)
 }
 
-// move moves cursor to specified position from the beginning of input
+// move cursor to specified position from the beginning of input
 // even if there is a line break.
 func (r *Render) move(from, to int) int {
 	fromX, fromY := r.toPos(from)
@@ -270,7 +218,7 @@ func (r *Render) toPos(cursor int) (x, y int) {
 }
 
 func (r *Render) lineWrap(cursor int) {
-	if runtime.GOOS != "windows" && cursor > 0 && cursor%int(r.col) == 0 {
+	if cursor > 0 && cursor%int(r.col) == 0 {
 		r.out.WriteRaw([]byte{'\n'})
 	}
 }

@@ -1,12 +1,20 @@
 package prompt
 
 import (
+	"bufio"
 	"bytes"
 	"os"
+	"regexp"
+	"strconv"
 	"time"
+	"unicode/utf8"
 
 	"github.com/c-bata/go-prompt/internal/debug"
 )
+
+// Sanitizer is called when user input something text, but before calling breakline/executor.  May be used to
+// modify the input text before committing to history, etc.
+type Sanitizer func(d Document) Document
 
 // Executor is called when user input something text.
 type Executor func(string)
@@ -18,23 +26,39 @@ type Executor func(string)
 // Exit means exit go-prompt (not the overall Go program)
 type ExitChecker func(in string, breakline bool) bool
 
-// Completer should return the suggest item from Document.
-type Completer func(Document) []Suggest
+type Refresh struct {
+	Options   RefreshOptions
+	StatusBar StatusBar
+}
+
+// RefreshChecker is called to determine whether to refresh the prompt.
+type RefreshChecker func(d *Document) bool
+
+// Completer should return the Suggest items and an optional inline value from Document.
+type Completer func(Document) ([]Suggest, string)
 
 // Prompt is core struct of go-prompt.
 type Prompt struct {
-	in                ConsoleParser
-	buf               *Buffer
-	renderer          *Render
-	executor          Executor
-	history           *History
-	completion        *CompletionManager
-	keyBindings       []KeyBind
-	ASCIICodeBindings []ASCIICodeBind
-	keyBindMode       KeyBindMode
-	completionOnDown  bool
-	exitChecker       ExitChecker
-	skipTearDown      bool
+	in                    ConsoleParser
+	r                     *bufio.Reader
+	buf                   *Buffer
+	renderer              *Render
+	sanitizer             Sanitizer
+	executor              Executor
+	history               *History
+	lexer                 *Lexer
+	completion            *CompletionManager
+	keyBindings           []KeyBind
+	ASCIICodeBindings     []ASCIICodeBind
+	keyBindMode           KeyBindMode
+	completionOnDown      bool
+	exitChecker           ExitChecker
+	skipTearDown          bool
+	lastBytes             []byte
+	cancelLineCallback    func(*Document)
+	captureRefreshTimings bool
+	refreshCh             chan Refresh
+	refreshTimings        []float64
 }
 
 // Exec is the struct contains user input context.
@@ -42,23 +66,75 @@ type Exec struct {
 	input string
 }
 
+func (p *Prompt) MustDestroy() {
+	if err := p.Destroy(); err != nil {
+		panic(err)
+	}
+}
+
+func (p *Prompt) Destroy() error {
+	return p.in.Destroy()
+}
+
+func (p *Prompt) Buffer(line string) {
+	p.buf = NewBufferWithLine(line)
+}
+
+type RefreshOptions uint8
+
+const (
+	RefreshUpdate RefreshOptions = 1 << iota
+	RefreshRender
+	RefreshStatusBar
+	RefreshAll  RefreshOptions = 0xFF
+	RefreshNone RefreshOptions = 0x00
+)
+
+func (p *Prompt) refresh(options RefreshOptions) {
+	if p.captureRefreshTimings {
+		start := time.Now()
+		defer func() { p.refreshTimings = append(p.refreshTimings, float64(time.Since(start).Nanoseconds())) }()
+	}
+	if options == RefreshAll {
+		p.renderer.out.EraseDown()
+	}
+	if options&RefreshUpdate == RefreshUpdate {
+		p.completion.Update(*p.buf.Document())
+		p.renderer.Render(p.buf, p.completion, p.lexer)
+	} else if options&RefreshRender == RefreshRender {
+		p.renderer.Render(p.buf, p.completion, p.lexer)
+	}
+	if options&RefreshStatusBar == RefreshStatusBar {
+		p.renderer.RenderStatusBar()
+	}
+}
+
+func (p *Prompt) RefreshCh() chan<- Refresh {
+	return p.refreshCh
+}
+
+// RefreshTimings returns the timings of each refresh.
+func (p *Prompt) RefreshTimings() []float64 {
+	return p.refreshTimings
+}
+
 // Run starts prompt.
 func (p *Prompt) Run() {
 	p.skipTearDown = false
+	debug.Setup()
 	defer debug.Teardown()
-	debug.Log("start prompt")
+	debug.Log("Run start prompt")
 	p.setUp()
 	defer p.tearDown()
 
+	opts := RefreshRender | RefreshStatusBar
 	if p.completion.showAtStart {
-		p.completion.Update(*p.buf.Document())
+		opts |= RefreshUpdate
 	}
+	p.refresh(opts)
 
-	p.renderer.Render(p.buf, p.completion)
-
-	bufCh := make(chan []byte, 128)
-	stopReadBufCh := make(chan struct{})
-	go p.readBuffer(bufCh, stopReadBufCh)
+	bufCh := make(chan []byte)
+	go p.readLine(bufCh)
 
 	exitCh := make(chan int)
 	winSizeCh := make(chan *WinSize)
@@ -68,51 +144,72 @@ func (p *Prompt) Run() {
 	for {
 		select {
 		case b := <-bufCh:
-			if shouldExit, e := p.feed(b); shouldExit {
-				p.renderer.BreakLine(p.buf)
-				stopReadBufCh <- struct{}{}
-				stopHandleSignalCh <- struct{}{}
-				return
-			} else if e != nil {
-				// Stop goroutine to run readBuffer function
-				stopReadBufCh <- struct{}{}
-				stopHandleSignalCh <- struct{}{}
-
-				// Unset raw mode
-				// Reset to Blocking mode because returned EAGAIN when still set non-blocking mode.
-				debug.AssertNoError(p.in.TearDown())
-				p.executor(e.input)
-
-				p.completion.Update(*p.buf.Document())
-
-				p.renderer.Render(p.buf, p.completion)
-
-				if p.exitChecker != nil && p.exitChecker(e.input, true) {
-					p.skipTearDown = true
+			for {
+				shouldExit, e, bufLeft, ended := p.feed(b)
+				if shouldExit {
+					p.renderer.BreakLine(p.buf, p.lexer)
+					stopHandleSignalCh <- struct{}{}
 					return
+				} else if e != nil {
+					stopHandleSignalCh <- struct{}{}
+
+					// Unset raw mode
+					// Reset to Blocking mode because returned EAGAIN when still set non-blocking mode.
+					debug.AssertNoError(p.in.TearDown())
+
+					p.executor(e.input)
+
+					if p.exitChecker != nil && p.exitChecker(e.input, true) {
+						p.skipTearDown = true
+						return
+					}
+					// Set raw mode
+					debug.AssertNoError(p.in.Setup())
+					go p.handleSignals(exitCh, winSizeCh, stopHandleSignalCh)
+				} else {
+					p.refresh(RefreshAll)
 				}
-				// Set raw mode
-				debug.AssertNoError(p.in.Setup())
-				go p.readBuffer(bufCh, stopReadBufCh)
-				go p.handleSignals(exitCh, winSizeCh, stopHandleSignalCh)
-			} else {
-				p.completion.Update(*p.buf.Document())
-				p.renderer.Render(p.buf, p.completion)
+				if ended {
+					go p.readLine(bufCh)
+				}
+				if len(bufLeft) == 0 {
+					break
+				}
+				b = bufLeft
 			}
 		case w := <-winSizeCh:
 			p.renderer.UpdateWinSize(w)
-			p.renderer.Render(p.buf, p.completion)
+			p.refresh(RefreshAll)
 		case code := <-exitCh:
-			p.renderer.BreakLine(p.buf)
+			p.renderer.BreakLine(p.buf, p.lexer)
 			p.tearDown()
 			os.Exit(code)
-		default:
-			time.Sleep(10 * time.Millisecond)
+		case refresh := <-p.refreshCh:
+			if refresh.Options&RefreshStatusBar == RefreshStatusBar {
+				p.renderer.statusBar = refresh.StatusBar
+			}
+			p.refresh(refresh.Options)
 		}
 	}
 }
 
-func (p *Prompt) feed(b []byte) (shouldExit bool, exec *Exec) {
+func (p *Prompt) feed(buf []byte) (shouldExit bool, exec *Exec, bufLeft []byte, ended bool) {
+	idx := bytes.IndexAny(buf, string([]byte{0xa, 0xd}))
+	var b []byte
+	if idx == 0 {
+		b = []byte{buf[0]}
+		if len(buf) > 1 {
+			bufLeft = buf[1:]
+		}
+	} else if idx != -1 {
+		b = buf[0:idx]
+		bufLeft = buf[idx:]
+	} else {
+		b = buf
+	}
+
+	defer func() { p.lastBytes = b }()
+
 	key := GetKey(b)
 	p.buf.lastKeyStroke = key
 	// completion
@@ -121,15 +218,27 @@ func (p *Prompt) feed(b []byte) (shouldExit bool, exec *Exec) {
 
 	switch key {
 	case Enter, ControlJ, ControlM:
-		p.renderer.BreakLine(p.buf)
-
-		exec = &Exec{input: p.buf.Text()}
-		p.buf = NewBuffer()
-		if exec.input != "" {
-			p.history.Add(exec.input)
+		// TODO: update to match on odd numbers of trailing backslashes: `(?:^|[^\\])\\(\\\\)*$`
+		match := regexp.MustCompile(`(\\+)$`).FindStringSubmatch(p.buf.Text())
+		if len(match) == 2 {
+			p.buf.DeleteBeforeCursor(len(match[1]))
+		} else {
+			if p.sanitizer != nil {
+				d := p.sanitizer(*p.buf.Document())
+				p.buf.setDocument(&d)
+			}
+			p.renderer.BreakLine(p.buf, p.lexer)
+			exec = &Exec{input: p.buf.Text()}
+			p.buf = NewBuffer()
+			if exec.input != "" {
+				p.history.Add(exec.input)
+			}
 		}
 	case ControlC:
-		p.renderer.BreakLine(p.buf)
+		if p.cancelLineCallback != nil {
+			p.cancelLineCallback(p.buf.Document())
+		}
+		p.renderer.BreakLine(p.buf, p.lexer)
 		p.buf = NewBuffer()
 		p.history.Clear()
 	case Up, ControlP:
@@ -150,11 +259,18 @@ func (p *Prompt) feed(b []byte) (shouldExit bool, exec *Exec) {
 			shouldExit = true
 			return
 		}
+	case ControlS:
+		ended = true
+		return
 	case NotDefined:
 		if p.handleASCIICodeBinding(b) {
 			return
 		}
-		p.buf.InsertText(string(b), false, true)
+		// Only insert printable characters
+		r, _ := utf8.DecodeRune(b)
+		if strconv.IsPrint(r) {
+			p.buf.InsertText(string(b), false, true)
+		}
 	}
 
 	shouldExit = p.handleKeyBinding(key)
@@ -181,6 +297,7 @@ func (p *Prompt) handleCompletionKeyBinding(key Key, completing bool) {
 			if w != "" {
 				p.buf.DeleteBeforeCursor(len([]rune(w)))
 			}
+			s = s.committed()
 			p.buf.InsertText(s.Text, false, true)
 		}
 		p.completion.Reset()
@@ -196,9 +313,8 @@ func (p *Prompt) handleKeyBinding(key Key) bool {
 		}
 	}
 
-	if p.keyBindMode == EmacsKeyBind {
-		for i := range emacsKeyBindings {
-			kb := emacsKeyBindings[i]
+	if p.keyBindMode == DefaultKeyBind {
+		for _, kb := range defaultKeyBindings() {
 			if kb.Key == key {
 				kb.Fn(p.buf)
 			}
@@ -231,55 +347,65 @@ func (p *Prompt) handleASCIICodeBinding(b []byte) bool {
 
 // Input just returns user input text.
 func (p *Prompt) Input() string {
+	debug.Setup()
 	defer debug.Teardown()
-	debug.Log("start prompt")
+	debug.Log("Input start prompt")
 	p.setUp()
 	defer p.tearDown()
 
+	opts := RefreshRender | RefreshStatusBar
 	if p.completion.showAtStart {
-		p.completion.Update(*p.buf.Document())
+		opts |= RefreshUpdate
 	}
+	p.refresh(opts)
 
-	p.renderer.Render(p.buf, p.completion)
-	bufCh := make(chan []byte, 128)
-	stopReadBufCh := make(chan struct{})
-	go p.readBuffer(bufCh, stopReadBufCh)
+	bufCh := make(chan []byte)
+	go p.readLine(bufCh)
 
-	for {
-		select {
-		case b := <-bufCh:
-			if shouldExit, e := p.feed(b); shouldExit {
-				p.renderer.BreakLine(p.buf)
-				stopReadBufCh <- struct{}{}
-				return ""
-			} else if e != nil {
-				// Stop goroutine to run readBuffer function
-				stopReadBufCh <- struct{}{}
-				return e.input
-			} else {
-				p.completion.Update(*p.buf.Document())
-				p.renderer.Render(p.buf, p.completion)
-			}
-		default:
-			time.Sleep(10 * time.Millisecond)
+	result := ""
+	for b := range bufCh {
+		if shouldExit, e, _, _ := p.feed(b); shouldExit {
+			p.renderer.BreakLine(p.buf, p.lexer)
+			break
+		} else if e != nil {
+			result = e.input
+		} else {
+			p.refresh(RefreshAll)
 		}
 	}
+	return result
 }
 
-func (p *Prompt) readBuffer(bufCh chan []byte, stopCh chan struct{}) {
-	debug.Log("start reading buffer")
-	for {
-		select {
-		case <-stopCh:
-			debug.Log("stop reading buffer")
-			return
-		default:
-			if b, err := p.in.Read(); err == nil && !(len(b) == 1 && b[0] == 0) {
-				bufCh <- b
+func (p *Prompt) readChunk() ([]byte, error) {
+	b := make([]byte, maxReadBytes)
+	n, err := p.r.Read(b)
+	return b[:n], err
+}
+
+func (p *Prompt) readLine(bufCh chan []byte) {
+	debug.Log("start reading input until end of line")
+
+	var last byte
+	for read := true; read; {
+		if chunk, err := p.readChunk(); err == nil && !(len(chunk) == 1 && chunk[0] == 0) {
+			start := 0
+			for i, b := range chunk {
+				key := GetKey([]byte{b})
+				isBreak := key == Enter || key == ControlJ || key == ControlM
+				if isBreak && last != '\\' {
+					bufCh <- chunk[start:i]
+					bufCh <- []byte{b}
+					start = i + 1
+					read = false
+				}
+				last = b
 			}
+			bufCh <- chunk[start:]
 		}
-		time.Sleep(10 * time.Millisecond)
 	}
+
+	bufCh <- GetCode(ControlS)
+	debug.Log("stopped reading input after reading end of line")
 }
 
 func (p *Prompt) setUp() {

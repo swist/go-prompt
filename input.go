@@ -1,6 +1,12 @@
 package prompt
 
-import "bytes"
+import (
+	"bufio"
+	"bytes"
+	"fmt"
+
+	"github.com/c-bata/go-prompt/internal/debug"
+)
 
 // WinSize represents the width and height of terminal.
 type WinSize struct {
@@ -18,6 +24,26 @@ type ConsoleParser interface {
 	GetWinSize() *WinSize
 	// Read returns byte array.
 	Read() ([]byte, error)
+	// Destroy should be called to close the input.
+	Destroy() error
+}
+
+type ConsoleParserReader struct {
+	in ConsoleParser
+}
+
+func (r *ConsoleParserReader) Read(p []byte) (n int, err error) {
+	b, err := r.in.Read()
+	if err != nil {
+		return 0, err
+	}
+	debug.Log(fmt.Sprintf("Read bytes: %x", b))
+	n = copy(p, b)
+	return n, nil
+}
+
+func NewStandardInputReader(in ConsoleParser) *bufio.Reader {
+	return bufio.NewReader(&ConsoleParserReader{in})
 }
 
 // GetKey returns Key correspond to input byte codes.
@@ -29,6 +55,17 @@ func GetKey(b []byte) Key {
 	}
 	return NotDefined
 }
+
+func GetCode(key Key) []byte {
+	for _, k := range ASCIISequences {
+		if k.Key == key {
+			return k.ASCIICode
+		}
+	}
+	return []byte{}
+}
+
+var ttyFallbackErrors = []string{}
 
 // ASCIISequences holds mappings of the key and byte array.
 var ASCIISequences = []*ASCIICode{
@@ -149,7 +186,7 @@ var ASCIISequences = []*ASCIICode{
 	{Key: ShiftLeft, ASCIICode: []byte{0x1b, 0x5b, 0x31, 0x3b, 0x32, 0x44}},
 
 	// Tmux sends following keystrokes when control+arrow is pressed, but for
-	// Emacs ansi-term sends the same sequences for normal arrow keys. Consider
+	// Bash ansi-term sends the same sequences for normal arrow keys. Consider
 	// it a normal arrow press, because that's more important.
 	{Key: Up, ASCIICode: []byte{0x1b, 0x4f, 0x41}},
 	{Key: Down, ASCIICode: []byte{0x1b, 0x4f, 0x42}},
@@ -166,4 +203,11 @@ var ASCIISequences = []*ASCIICode{
 
 	{Key: Ignore, ASCIICode: []byte{0x1b, 0x5b, 0x45}}, // Xterm
 	{Key: Ignore, ASCIICode: []byte{0x1b, 0x5b, 0x46}}, // Linux console
+
+	{Key: MetaB, ASCIICode: []byte{0x1b, 0x62}},
+	{Key: MetaD, ASCIICode: []byte{0x1b, 0x64}},
+	{Key: MetaF, ASCIICode: []byte{0x1b, 0x66}},
+
+	{Key: MetaLeft, ASCIICode: []byte{0x1b, 0x1b, 0x5b, 0x44}},
+	{Key: MetaRight, ASCIICode: []byte{0x1b, 0x1b, 0x5b, 0x43}},
 }

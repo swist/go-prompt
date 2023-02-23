@@ -45,3 +45,11 @@ func ExampleLastIndexNotAny() {
 	// 5
 	// -1
 }
+
+func ExampleContains() {
+	fmt.Println(strings.Contains([]string{"a", "b", "c"}, "b"))
+	fmt.Println(strings.Contains([]string{"a", "b", "c"}, "d"))
+	// Output:
+	// true
+	// false
+}

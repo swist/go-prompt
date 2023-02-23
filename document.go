@@ -27,9 +27,22 @@ func NewDocument() *Document {
 	}
 }
 
+// NewDocument return the new document with specific fields.
+func NewDocumentWith(text string, cursorPosition int, lastKey Key) *Document {
+	return &Document{
+		Text:           text,
+		cursorPosition: cursorPosition,
+		lastKey:        lastKey,
+	}
+}
+
 // LastKeyStroke return the last key pressed in this document.
 func (d *Document) LastKeyStroke() Key {
 	return d.lastKey
+}
+
+func (d *Document) RawCursorPosition() int {
+	return d.cursorPosition
 }
 
 // DisplayCursorPosition returns the cursor position on rendered text on terminal emulators.
