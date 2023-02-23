@@ -29,6 +29,7 @@ type Prompt struct {
 	renderer          *Render
 	executor          Executor
 	history           *History
+	lexer             *Lexer
 	completion        *CompletionManager
 	keyBindings       []KeyBind
 	ASCIICodeBindings []ASCIICodeBind
@@ -60,7 +61,7 @@ func (p *Prompt) Run() {
 		p.completion.Update(*p.buf.Document())
 	}
 
-	p.renderer.Render(p.buf, p.prevText, p.completion)
+	p.renderer.Render(p.buf, p.prevText, p.completion, p.lexer)
 
 	bufCh := make(chan []byte, 128)
 	stopReadBufCh := make(chan struct{})
@@ -75,7 +76,7 @@ func (p *Prompt) Run() {
 		select {
 		case b := <-bufCh:
 			if shouldExit, e := p.feed(b); shouldExit {
-				p.renderer.BreakLine(p.buf)
+				p.renderer.BreakLine(p.buf, p.lexer)
 				stopReadBufCh <- struct{}{}
 				stopHandleSignalCh <- struct{}{}
 				return
@@ -91,7 +92,7 @@ func (p *Prompt) Run() {
 
 				p.completion.Update(*p.buf.Document())
 
-				p.renderer.Render(p.buf, p.prevText, p.completion)
+				p.renderer.Render(p.buf, p.prevText, p.completion, p.lexer)
 
 				if p.exitChecker != nil && p.exitChecker(e.input, true) {
 					p.skipTearDown = true
@@ -103,13 +104,13 @@ func (p *Prompt) Run() {
 				go p.handleSignals(exitCh, winSizeCh, stopHandleSignalCh)
 			} else {
 				p.completion.Update(*p.buf.Document())
-				p.renderer.Render(p.buf, p.prevText, p.completion)
+				p.renderer.Render(p.buf, p.prevText, p.completion, p.lexer)
 			}
 		case w := <-winSizeCh:
 			p.renderer.UpdateWinSize(w)
-			p.renderer.Render(p.buf, p.prevText, p.completion)
+			p.renderer.Render(p.buf, p.prevText, p.completion, p.lexer)
 		case code := <-exitCh:
-			p.renderer.BreakLine(p.buf)
+			p.renderer.BreakLine(p.buf, p.lexer)
 			p.tearDown()
 			os.Exit(code)
 		default:
@@ -129,7 +130,7 @@ func (p *Prompt) feed(b []byte) (shouldExit bool, exec *Exec) {
 
 	switch key {
 	case Enter, ControlJ, ControlM:
-		p.renderer.BreakLine(p.buf)
+		p.renderer.BreakLine(p.buf, p.lexer)
 
 		exec = &Exec{input: p.buf.Text()}
 		p.buf = NewBuffer()
@@ -137,7 +138,7 @@ func (p *Prompt) feed(b []byte) (shouldExit bool, exec *Exec) {
 			p.history.Add(exec.input)
 		}
 	case ControlC:
-		p.renderer.BreakLine(p.buf)
+		p.renderer.BreakLine(p.buf, p.lexer)
 		p.buf = NewBuffer()
 		p.history.Clear()
 	case Up, ControlP:
@@ -269,7 +270,7 @@ func (p *Prompt) Input() string {
 		p.completion.Update(*p.buf.Document())
 	}
 
-	p.renderer.Render(p.buf, p.prevText, p.completion)
+	p.renderer.Render(p.buf, p.prevText p.completion, p.lexer)
 	bufCh := make(chan []byte, 128)
 	stopReadBufCh := make(chan struct{})
 	go p.readBuffer(bufCh, stopReadBufCh)
@@ -278,7 +279,7 @@ func (p *Prompt) Input() string {
 		select {
 		case b := <-bufCh:
 			if shouldExit, e := p.feed(b); shouldExit {
-				p.renderer.BreakLine(p.buf)
+				p.renderer.BreakLine(p.buf, p.lexer)
 				stopReadBufCh <- struct{}{}
 				return ""
 			} else if e != nil {
@@ -287,7 +288,7 @@ func (p *Prompt) Input() string {
 				return e.input
 			} else {
 				p.completion.Update(*p.buf.Document())
-				p.renderer.Render(p.buf, p.prevText, p.completion)
+				p.renderer.Render(p.buf, p.prevText, p.completion, p.lexer)
 			}
 		default:
 			time.Sleep(10 * time.Millisecond)

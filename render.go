@@ -175,8 +175,7 @@ func (r *Render) ClearScreen() {
 }
 
 // Render renders to the console.
-func (r *Render) Render(buffer *Buffer, previousText string, completion *CompletionManager) {
-	defer debug.Un(debug.Trace("Render"))
+func (r *Render) Render(buffer *Buffer, previousText string, completion *CompletionManager, lexer *Lexer) {
 	// In situations where a pseudo tty is allocated (e.g. within a docker container),
 	// window size via TIOCGWINSZ is not immediately available and will result in 0,0 dimensions.
 	if r.col == 0 {
@@ -214,10 +213,14 @@ func (r *Render) Render(buffer *Buffer, previousText string, completion *Complet
 	r.out.EraseDown()
 	r.renderPrefix()
 
+	r.out.SetColor(DefaultColor, DefaultColor, false)
+
+	r.lineWrap(cursor)
+
 	if buffer.NewLineCount() > 0 {
-		r.renderMultiline(buffer)
+		r.renderMultiline(buffer, lexer)
 	} else {
-		r.out.WriteStr(line)
+		r.renderLine(line, lexer)
 		defer r.out.ShowCursor()
 	}
 
@@ -236,7 +239,25 @@ func (r *Render) Render(buffer *Buffer, previousText string, completion *Complet
 		cursor += runewidth.StringWidth(suggest.Text)
 
 		rest := buffer.Document().TextAfterCursor()
-		r.out.WriteStr(rest)
+
+		if lexer.IsEnabled {
+			processed := lexer.Process(rest)
+
+			var s = rest
+
+			for _, v := range processed {
+				a := strings.SplitAfter(s, v.Text)
+				s = strings.TrimPrefix(s, a[0])
+
+				r.out.SetColor(v.Color, r.inputBGColor, false)
+				r.out.WriteStr(a[0])
+			}
+		} else {
+			r.out.WriteStr(rest)
+		}
+
+		r.out.SetColor(DefaultColor, DefaultColor, false)
+
 		cursor += runewidth.StringWidth(rest)
 		r.lineWrap(cursor)
 
@@ -245,7 +266,25 @@ func (r *Render) Render(buffer *Buffer, previousText string, completion *Complet
 	r.previousCursor = cursor
 }
 
-func (r *Render) renderMultiline(buffer *Buffer) {
+func (r *Render) renderLine(line string, lexer *Lexer) {
+	if lexer.IsEnabled {
+		processed := lexer.Process(line)
+		var s = line
+
+		for _, v := range processed {
+			a := strings.SplitAfter(s, v.Text)
+			s = strings.TrimPrefix(s, a[0])
+
+			r.out.SetColor(v.Color, r.inputBGColor, false)
+			r.out.WriteStr(a[0])
+		}
+	} else {
+		r.out.SetColor(r.inputTextColor, r.inputBGColor, false)
+		r.out.WriteStr(line)
+	}
+}
+
+func (r *Render) renderMultiline(buffer *Buffer, lexer *Lexer) {
 	before := buffer.Document().TextBeforeCursor()
 	cursor := ""
 	after := ""
@@ -262,24 +301,42 @@ func (r *Render) renderMultiline(buffer *Buffer) {
 	}
 
 	r.out.SetColor(r.inputTextColor, r.inputBGColor, false)
-	r.out.WriteStr(before)
+	r.renderLine(before, lexer)
 
 	r.out.SetDisplayAttributes(r.inputTextColor, r.inputBGColor, DisplayReverse)
-	r.out.WriteStr(cursor)
+	r.renderLine(cursor, lexer)
 
 	r.out.SetColor(r.inputTextColor, r.inputBGColor, false)
-	r.out.WriteStr(after)
+	r.renderLine(after, lexer)
 }
 
 // BreakLine to break line.
-func (r *Render) BreakLine(buffer *Buffer) {
+func (r *Render) BreakLine(buffer *Buffer, lexer *Lexer) {
 	// Erasing and Render
 	cursor := (buffer.NewLineCount() * int(r.col)) + runewidth.StringWidth(buffer.Document().TextBeforeCursor()) + runewidth.StringWidth(r.getCurrentPrefix())
 	r.clear(cursor)
+
 	r.renderPrefix()
-	r.out.SetColor(r.inputTextColor, r.inputBGColor, false)
-	r.out.WriteStr(buffer.Document().Text + "\n")
+
+	if lexer.IsEnabled {
+		processed := lexer.Process(buffer.Document().Text + "\n")
+
+		var s = buffer.Document().Text + "\n"
+
+		for _, v := range processed {
+			a := strings.SplitAfter(s, v.Text)
+			s = strings.TrimPrefix(s, a[0])
+
+			r.out.SetColor(v.Color, r.inputBGColor, false)
+			r.out.WriteStr(a[0])
+		}
+	} else {
+		r.out.SetColor(r.inputTextColor, r.inputBGColor, false)
+		r.out.WriteStr(buffer.Document().Text + "\n")
+	}
+
 	r.out.SetColor(DefaultColor, DefaultColor, false)
+
 	debug.AssertNoError(r.out.Flush())
 	if r.breakLineCallback != nil {
 		r.breakLineCallback(buffer.Document())
