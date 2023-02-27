@@ -21,22 +21,26 @@ type ExitChecker func(in string, breakline bool) bool
 // Completer should return the suggest item from Document.
 type Completer func(Document) []Suggest
 
+// StatementTerminatorCb should return whether statement in buffer has been terminated
+type StatementTerminatorCb func(lastKeyStroke Key, buffer *Buffer) bool
+
 // Prompt is core struct of go-prompt.
 type Prompt struct {
-	in                ConsoleParser
-	buf               *Buffer
-	prevText          string
-	renderer          *Render
-	executor          Executor
-	history           *History
-	lexer             *Lexer
-	completion        *CompletionManager
-	keyBindings       []KeyBind
-	ASCIICodeBindings []ASCIICodeBind
-	keyBindMode       KeyBindMode
-	completionOnDown  bool
-	exitChecker       ExitChecker
-	skipTearDown      bool
+	in                    ConsoleParser
+	buf                   *Buffer
+	prevText              string
+	renderer              *Render
+	executor              Executor
+	history               *History
+	lexer                 *Lexer
+	completion            *CompletionManager
+	keyBindings           []KeyBind
+	ASCIICodeBindings     []ASCIICodeBind
+	keyBindMode           KeyBindMode
+	completionOnDown      bool
+	exitChecker           ExitChecker
+	statementTerminatorCb StatementTerminatorCb
+	skipTearDown          bool
 }
 
 // Exec is the struct contains user input context.
@@ -130,12 +134,15 @@ func (p *Prompt) feed(b []byte) (shouldExit bool, exec *Exec) {
 
 	switch key {
 	case Enter, ControlJ, ControlM:
-		p.renderer.BreakLine(p.buf, p.lexer)
-
-		exec = &Exec{input: p.buf.Text()}
-		p.buf = NewBuffer()
-		if exec.input != "" {
-			p.history.Add(exec.input)
+		if p.statementTerminatorCb == nil || !p.statementTerminatorCb(p.buf.lastKeyStroke, p.buf) {
+			p.buf.NewLine(false)
+		} else {
+			p.renderer.BreakLine(p.buf, p.lexer)
+			exec = &Exec{input: p.buf.Text()}
+			p.buf = NewBuffer()
+			if exec.input != "" {
+				p.history.Add(exec.input)
+			}
 		}
 	case ControlC:
 		p.renderer.BreakLine(p.buf, p.lexer)
@@ -270,7 +277,7 @@ func (p *Prompt) Input() string {
 		p.completion.Update(*p.buf.Document())
 	}
 
-	p.renderer.Render(p.buf, p.prevText p.completion, p.lexer)
+	p.renderer.Render(p.buf, p.prevText, p.completion, p.lexer)
 	bufCh := make(chan []byte, 128)
 	stopReadBufCh := make(chan struct{})
 	go p.readBuffer(bufCh, stopReadBufCh)

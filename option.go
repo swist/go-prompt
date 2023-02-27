@@ -274,6 +274,15 @@ func OptionSetLexer(fn LexerFunc) Option {
 	}
 }
 
+// OptionSetStatementTerminator allows you to configure a callback that tells you if statement
+// has been terminated and ready to pass to exec in a (potentially) multiline buffer
+func OptionSetStatementTerminator(fn StatementTerminatorCb) Option {
+	return func(p *Prompt) error {
+		p.statementTerminatorCb = fn
+		return nil
+	}
+}
+
 // New returns a Prompt with powerful auto-completion.
 func New(executor Executor, completer Completer, opts ...Option) *Prompt {
 	defaultWriter := NewStdoutWriter()

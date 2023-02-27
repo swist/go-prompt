@@ -304,7 +304,7 @@ func (r *Render) renderMultiline(buffer *Buffer, lexer *Lexer) {
 	r.renderLine(before, lexer)
 
 	r.out.SetDisplayAttributes(r.inputTextColor, r.inputBGColor, DisplayReverse)
-	r.renderLine(cursor, lexer)
+	r.out.WriteRawStr(cursor)
 
 	r.out.SetColor(r.inputTextColor, r.inputBGColor, false)
 	r.renderLine(after, lexer)
