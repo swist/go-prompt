@@ -14,6 +14,7 @@ func (p *Prompt) handleSignals(exitCh chan int, winSizeCh chan *WinSize, stop ch
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(
 		sigCh,
+		os.Interrupt,
 		syscall.SIGINT,
 		syscall.SIGTERM,
 		syscall.SIGQUIT,
@@ -27,7 +28,11 @@ func (p *Prompt) handleSignals(exitCh chan int, winSizeCh chan *WinSize, stop ch
 		case s := <-sigCh:
 			switch s {
 
-			case syscall.SIGINT: // kill -SIGINT XXXX or Ctrl+c
+			case os.Interrupt: // Ctrl+C
+				debug.Log("Catch Ctrl+C")
+				exitCh <- NativeInterrupt
+
+			case syscall.SIGINT: // kill -SIGINT XXXX
 				debug.Log("Catch SIGINT")
 				exitCh <- 0
 

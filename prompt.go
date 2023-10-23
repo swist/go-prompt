@@ -181,9 +181,15 @@ func (p *Prompt) Run() {
 			p.renderer.UpdateWinSize(w)
 			p.refresh(RefreshAll)
 		case code := <-exitCh:
-			p.renderer.BreakLine(p.buf, p.lexer)
-			p.tearDown()
-			os.Exit(code)
+			if code == NativeInterrupt { // workaround for handling os.Interrupt in signal_windows.go
+				go func() {
+					bufCh <- GetCode(ControlC)
+				}()
+			} else {
+				p.renderer.BreakLine(p.buf, p.lexer)
+				p.tearDown()
+				os.Exit(code)
+			}
 		case refresh := <-p.refreshCh:
 			if refresh.Options&RefreshStatusBar == RefreshStatusBar {
 				p.renderer.statusBar = refresh.StatusBar

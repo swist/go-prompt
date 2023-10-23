@@ -32,6 +32,8 @@ type ConsoleParserReader struct {
 	in ConsoleParser
 }
 
+const NativeInterrupt = -1
+
 func (r *ConsoleParserReader) Read(p []byte) (n int, err error) {
 	b, err := r.in.Read()
 	if err != nil {
