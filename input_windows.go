@@ -21,7 +21,8 @@ var procGetNumberOfConsoleInputEvents = kernel32.NewProc("GetNumberOfConsoleInpu
 
 // WindowsParser is a ConsoleParser implementation for Win32 console.
 type WindowsParser struct {
-	tty *tty.TTY
+	tty     *tty.TTY
+	destroy func() error
 }
 
 // Setup should be called before starting input
@@ -29,6 +30,10 @@ func (p *WindowsParser) Setup() error {
 	t, err := tty.Open()
 	if err != nil {
 		return err
+	}
+	if p.destroy, err = t.Raw(); err != nil {
+		debug.Log(fmt.Sprintf("error setting raw mode: %v", err))
+		p.destroy = func() error { return nil }
 	}
 	p.tty = t
 	return nil
@@ -46,6 +51,9 @@ func (p *WindowsParser) Destroy() error {
 			debug.Log(fmt.Sprintf("recovered panic closing go-tty channel: %v", r))
 		}
 	}()
+	if err := p.destroy(); err != nil {
+		debug.Log(fmt.Sprintf("error restoring tty state: %v", err))
+	}
 	return p.tty.Close()
 }
 

@@ -3,6 +3,7 @@
 package prompt
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -27,22 +28,21 @@ func (p *Prompt) handleSignals(exitCh chan int, winSizeCh chan *WinSize, stop ch
 			return
 		case s := <-sigCh:
 			switch s {
-
-			case os.Interrupt: // Ctrl+C
-				debug.Log("Catch Ctrl+C")
-				exitCh <- NativeInterrupt
-
-			case syscall.SIGINT: // kill -SIGINT XXXX
-				debug.Log("Catch SIGINT")
+			case os.Interrupt: // Ctrl+C, must handle first
+				// Not needed when console raw mode is enabled, but will leave it in case raw mode setup fails
+				debug.Log("Interrupt")
+				exitCh <- int(ControlC)
+			case syscall.SIGINT:
+				debug.Log("SIGINT")
 				exitCh <- 0
-
-			case syscall.SIGTERM: // kill -SIGTERM XXXX
-				debug.Log("Catch SIGTERM")
+			case syscall.SIGTERM:
+				debug.Log("SIGTERM")
 				exitCh <- 1
-
-			case syscall.SIGQUIT: // kill -SIGQUIT XXXX
-				debug.Log("Catch SIGQUIT")
+			case syscall.SIGQUIT:
+				debug.Log("SIGQUIT")
 				exitCh <- 0
+			default:
+				debug.Log(fmt.Sprintf("Unhandled signal: %v", s))
 			}
 		}
 	}

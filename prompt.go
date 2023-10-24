@@ -181,10 +181,8 @@ func (p *Prompt) Run() {
 			p.renderer.UpdateWinSize(w)
 			p.refresh(RefreshAll)
 		case code := <-exitCh:
-			if code == NativeInterrupt { // workaround for handling os.Interrupt in signal_windows.go
-				go func() {
-					bufCh <- GetCode(ControlC)
-				}()
+			if code == int(ControlC) { // Windows, non-raw mode fallback
+				go func() { bufCh <- GetCode(ControlC) }()
 			} else {
 				p.renderer.BreakLine(p.buf, p.lexer)
 				p.tearDown()
