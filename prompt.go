@@ -270,10 +270,16 @@ func (p *Prompt) feed(buf []byte) (shouldExit bool, exec *Exec, bufLeft []byte, 
 		if p.handleASCIICodeBinding(b) {
 			return
 		}
+		i := 0
+		r, _ := utf8.DecodeRune(b[i:])
+		// AltGr key handling: expect ESC (0x1b) followed by Unicode character; skip ESC
+		if r == 0x1b {
+			i = 1
+			r, _ = utf8.DecodeRune(b[i:])
+		}
 		// Only insert printable characters
-		r, _ := utf8.DecodeRune(b)
 		if strconv.IsPrint(r) {
-			p.buf.InsertText(string(b), false, true)
+			p.buf.InsertText(string(b[i:]), false, true)
 		}
 	}
 
