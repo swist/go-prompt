@@ -270,21 +270,25 @@ func (p *Prompt) feed(buf []byte) (shouldExit bool, exec *Exec, bufLeft []byte, 
 		if p.handleASCIICodeBinding(b) {
 			return
 		}
-		i := 0
-		r, _ := utf8.DecodeRune(b[i:])
-		// AltGr key handling: expect ESC (0x1b) followed by Unicode character; skip ESC
-		if r == 0x1b {
-			i = 1
-			r, _ = utf8.DecodeRune(b[i:])
-		}
+		r, _ := nextRuneSkippingLeadingEsc(b)
 		// Only insert printable characters
-		if strconv.IsPrint(r) {
-			p.buf.InsertText(string(b[i:]), false, true)
+		if r != utf8.RuneError && strconv.IsPrint(r) {
+			p.buf.InsertText(string(r), false, true)
 		}
 	}
 
 	shouldExit = p.handleKeyBinding(key)
 	return
+}
+
+// nextRuneSkippingLeadingEsc returns the next rune from the b skipping any leading ESC. This is mainly intended
+// for Windows AltGr key handling where b contains ESC (0x1b) is followed by a Unicode character.
+func nextRuneSkippingLeadingEsc(b []byte) (r rune, size int) {
+	r, size = utf8.DecodeRune(b)
+	if r == 0x1b {
+		r, size = utf8.DecodeRune(b[size:])
+	}
+	return r, size
 }
 
 func (p *Prompt) handleCompletionKeyBinding(key Key, completing bool) {
